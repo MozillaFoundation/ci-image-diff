@@ -26,7 +26,21 @@ on windows:
 
 ## getting screenshots
 
-`(venv) python test.py URL [--width WIDTH]`
+```
+usage: test.py [-h] [-f FILE] [-w WIDTH] url
+
+Take a screenshot of a web page.
+
+positional arguments:
+  url                   The URL for the web page.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -f FILE, --file FILE  The file path to save the screenshot to, defaults to
+                        "screenshot.png".
+  -w WIDTH, --width WIDTH
+                        The browser width in pixels, defaults to 1200.
+```
 
 this will create three screenshots, one for chrome, firefox,
 and webkit each, with the indicated width (or 1200) in the
@@ -34,8 +48,20 @@ filename.
 
 
 ## diffing images
+```
+usage: diff.py [-h] [-w WRITE] original new
 
-`(venv) python diff.py original.png new.png`
+Diff two (bitmap) images.
+
+positional arguments:
+  original              The path for the original image.
+  new                   The path for the new image.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -w WRITE, --write WRITE
+                        write the highlighted images to disk.
+```
 
 Note that under no circumstances do you want to use JPG images
 here, because JPG block compression _will_ show up as diff, so

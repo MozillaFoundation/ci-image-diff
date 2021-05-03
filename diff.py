@@ -8,8 +8,8 @@ In order to get meaningful diffs, do not feed this JPEG images. The block compre
 to flag about a million differences that aren't actually there. Use a bitmap format like PNG.
 """
 
-import sys
 import cv2
+import argparse
 import numpy as np
 import imutils
 from skimage.metrics import structural_similarity
@@ -20,15 +20,19 @@ RED = (0,0,255)
 GREEN = (0,255,0)
 BLUE = (255,0,0)
 
+parser = argparse.ArgumentParser(description='Diff two (bitmap) images.')
+parser.add_argument('original', help='The path for the original image.')
+parser.add_argument('new', help='The path for the new image.')
+parser.add_argument('-w', '--write', default='diff', help='write the highlighted images to disk.')
+args = parser.parse_args()
 
-def loadImage(i):
+
+def loadImage(path):
 	"""
 	Load an image, or explain why that wasn't possible
 	"""
 	try:
-		pos = sys.argv.index(__file__)
-		fname = sys.argv[pos+i]
-		image = cv2.imread(fname, cv2.IMREAD_COLOR)
+		image = cv2.imread(path, cv2.IMREAD_COLOR)
 		if image is None:
 			raise ValueError(f"{fname} is not an image, or does not exist")
 		return image
@@ -218,9 +222,13 @@ def highlight_diffs(a, b, diffs):
 	a = cv2.addWeighted(ao, alpha, a, 1 - alpha, 0)
 	b = cv2.addWeighted(bo, alpha, b, 1 - alpha, 0)
 
-	cv2.imshow("Stock", a)
-	cv2.imshow("Given", b)
-	cv2.waitKey(0)
+	if (args.write):
+		cv2.imwrite(f'{args.write}-original.png', a)
+		cv2.imwrite(f'{args.write}-new.png', b)
+	else:
+		cv2.imshow("Stock", a)
+		cv2.imshow("Given", b)
+		cv2.waitKey(0)
 
 
 def gray(img):
@@ -279,6 +287,5 @@ def make_same_size(a, b):
 	return a, b
 # -----------------------------------------------------------------
 
-if sys.stdin.isatty():
-	imageA, imageB = make_same_size(loadImage(1), loadImage(2))
-	perform_diffing(imageA, imageB)
+imageA, imageB = make_same_size(loadImage(args.original), loadImage(args.new))
+perform_diffing(imageA, imageB)

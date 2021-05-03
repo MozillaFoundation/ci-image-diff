@@ -26,7 +26,7 @@ on windows:
 
 ## getting screenshots
 
-`>python test.py URL [--width WIDTH]`
+`(venv) python test.py URL [--width WIDTH]`
 
 this will create three screenshots, one for chrome, firefox,
 and webkit each, with the indicated width (or 1200) in the
@@ -35,9 +35,13 @@ filename.
 
 ## diffing images
 
-`>python diff.py original.png new.png`
+`(venv) python diff.py original.png new.png`
 
 Note that under no circumstances do you want to use JPG images
 here, because JPG block compression _will_ show up as diff, so
 you end up with a page that, to humans, looks the same, and to
 the computer looks literally 100% different. Not super useful.
+
+- GREEN diff regions are "changed content", 
+- RED diff regions are "new content"
+- BLUE diff regions are "moved content"

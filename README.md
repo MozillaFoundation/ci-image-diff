@@ -6,23 +6,18 @@ This project is still in progress, see https://github.com/Pomax/ci-image-diff/is
 
 ## getting set up
 
-on unix/linux/macos/etc:
-
 ```
 $ git clone https://github.com/Pomax/ci-image-diff
 $ cd ci-image-diff
 $ python3 -m venv venv
-$ ./venv/bin/activate
-(venv) $ pip install -r requirements.txt
 ```
 
-on windows:
+To activate the virtual environment, on unix/linux/macos/etc.
+run: `./venv/bin/activate`, on windows run: `venv\Scripts\activate`.
+
+Then to install the dependencies:
 
 ```
-> git clone https://github.com/Pomax/ci-image-diff
-> cd ci-image-diff
-> python3 -m venv venv
-> venv\Scripts\activate
 (venv) > pip install -r requirements.txt
 ```
 

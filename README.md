@@ -7,7 +7,7 @@ This project is still in progress, see https://github.com/MozillaFoundation/ci-i
 ## getting set up
 
 ```
-$ git clone https://github.com/Pomax/ci-image-diff
+$ git clone https://github.com/MozillaFoundation/ci-image-diff
 $ cd ci-image-diff
 $ python3 -m venv venv
 ```

@@ -2,7 +2,7 @@
 
 A visual regression CI solution for web content, based on opencv and playwright
 
-This project is still in progress, see https://github.com/Pomax/ci-image-diff/issues for what's left before v1.0 is ready.
+This project is still in progress, see https://github.com/MozillaFoundation/ci-image-diff/issues for what's left before v1.0 is ready.
 
 ## getting set up
 

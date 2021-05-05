@@ -6,10 +6,12 @@ This project is still in progress, see https://github.com/MozillaFoundation/ci-i
 
 ## getting set up
 
+The following assumes that `python` is Python 3.7 or later (which is the only supported version of Python at the time of writing this README). If you still have a dual Python 2.x/3.x setup, you will want to use `python3` as executable command instead.
+
 ```
 $ git clone https://github.com/MozillaFoundation/ci-image-diff
 $ cd ci-image-diff
-$ python3 -m venv venv
+$ python -m venv venv
 ```
 
 To activate the virtual environment, on unix/linux/macos/etc.

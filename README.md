@@ -71,3 +71,8 @@ the computer looks literally 100% different. Not super useful.
 - GREEN diff regions are "changed content", 
 - RED diff regions are "new content"
 - BLUE diff regions are "moved content"
+
+
+## Development
+
+See https://github.com/MozillaFoundation/ci-image-diff/projects/1 for the MVP kanban

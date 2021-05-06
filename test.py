@@ -2,14 +2,19 @@
 Test script requires:
 
 - argparse
-- pyppeteer
+- playwright
 
 """
+
 
 import sys
 import argparse
 import asyncio
+
 from playwright.async_api import async_playwright
+
+import importlib
+utils = importlib.import_module('utils')
 
 parser = argparse.ArgumentParser(description='Take a screenshot of a web page.')
 parser.add_argument('url', help='The URL for the web page.')

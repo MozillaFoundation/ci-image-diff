@@ -1,0 +1,12 @@
+# Python stuff that gets built wherever this code gets run:
+__pycache__
+venv
+
+# We don't want to store any diff images on the repo
+*.jpg
+*.png
+
+# We also don't want the diffs dirstructure committed, but
+# we do want to make sure that README.md is there.
+diffs/**/*
+!diffs/README.md

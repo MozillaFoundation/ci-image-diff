@@ -30,21 +30,14 @@ def loadImage(path):
 		raise ValueError("please use: diff.py [filename] [filename]")
 
 
-def compare(how, im1, img2):
+def compare(how, img1, img2):
 	"""
 	Perform SSIM and find diff contours on the result
 	"""
 
-	(score, diff) = structural_similarity(im1, img2, full=True)
+	# full=True gives us both the similarity score and the diff map
+	score, diff = structural_similarity(img1, img2, full=True)
 	diff = (diff * 255).astype("uint8")
-
-	# boost any diffed region (towards black, not towards white)
-	for y in range(diff.shape[0]):
-		for x in range(diff.shape[1]):
-			diff[y,x] = (diff[y,x] >> 1) if diff[y,x] < 250 else diff[y,x]
-
-	#cv2.imshow(f"{how} diff", diff)
-
 	return diff
 
 
@@ -81,7 +74,7 @@ def extract_contours(diff, diffs=[], tinydiffs=[]):
 
 def filter_diffs(diffs):
 	"""
-	This is ineffifient, but cv2.RETR_EXTERNAL should have already removed
+	This is inefficient, but cv2.RETR_EXTERNAL should have already removed
 	all contours contained by other contours... but it hasn't. So we do this.
 	"""
 	def not_contained(e, diffs):
@@ -93,7 +86,7 @@ def filter_diffs(diffs):
 	return [e for e in diffs if not_contained(e, diffs)]
 
 
-def collapse_diffs(a, diffs, tolerance=5):
+def collapse_diffs(a, diffs, tolerance=3):
 	"""
 	draw all diffs, dilated by [tolerance], then re-compute the resulting contours
 	"""
@@ -102,7 +95,6 @@ def collapse_diffs(a, diffs, tolerance=5):
 	cv2.rectangle(canvas, (0,0), (w,h), WHITE, cv2.FILLED)
 	for d in diffs:
 		cv2.rectangle(canvas, (d[0] - tolerance, d[1] - tolerance), (d[2] + tolerance, d[3] + tolerance), BLACK, cv2.FILLED)
-	#cv2.imshow("dilated", canvas)
 	diffs, tinydiffs = extract_contours(gray(canvas))
 	return filter_diffs(diffs)
 
@@ -127,22 +119,11 @@ def find_in_original(a, b, area):
 	crop = b[area[1]:area[3], area[0]:area[2]]
 	result = cv2.matchTemplate(crop, a, cv2.TM_CCOEFF_NORMED)
 
+	min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+	(startX, startY) = max_loc
 	w = (area[2] - area[0])
 	h = (area[3] - area[1])
-	loc = np.where( result >= 0.8)
-	minDist = (w * h)
-	minPoint = None
-	for pt in zip(*loc[::-1]):
-		dist = get_distance(area[0] + w/2, area[1] + h/2, pt[0] + w/2, pt[1] + h/2)
-		if dist < minDist:
-			minDist = dist
-			minPoint = pt
-
-	if minPoint:
-		(startX, startY) = minPoint
-	else:
-		(minVal, maxVal, minLoc, maxLoc) = cv2.minMaxLoc(result)
-		(startX, startY) = maxLoc
+	(endX, endY) = (startX + w, startY + h)
 
 	endX = startX + w
 	endY = startY + h
@@ -173,9 +154,9 @@ def find_in_original(a, b, area):
 		crop = b[startY:endY, startX:endX]
 		diff = mse_similarity(gray(ocrop), gray(crop))
 		if diff == 0:
+			# both old and new have the same data for the same crop
+			# region: this isn't actually a diff at all.
 			region = []
-			#print(diff, startX, startY, w, h)
-			#cv2.imshow("result", result)
 
 	return region
 
@@ -188,25 +169,30 @@ def highlight_diffs(a, b, diffs, write=False):
 	ao = a.copy()
 	bo = b.copy()
 
-	for area in (diffs):
+	rcol = 0
+
+	for num, area in enumerate(diffs):
 		x1, y1, x2, y2 = area
+		print(f"processing diff {num+1}")
 
 		# is this a relocation, or an addition/deletion?
 		origin = find_in_original(a, b, area)
 		if origin is not None:
 			if len(origin) == 0:
-				# this region was is effectively a "noop": it's an area that got flagged
+				# this region was effectively a "noop": it's an area that got flagged
 				# as a difference, but the corresponding "original location" is the same
 				# in both images, thus suggesting that we're actually looking at something
 				# that's either whitespace, or something that acts similar to whitespace.
 				pass
-			elif origin == area:
-				cv2.rectangle(bo, (x1, y1), (x2, y2), GREEN, cv2.FILLED)
 			else:
+				# relocated content
 				cv2.rectangle(ao, (origin[0], origin[1]), (origin[2], origin[3]), BLUE, cv2.FILLED)
+				cv2.rectangle(ao, (origin[0], origin[1]), (origin[2], origin[3]), BLACK, 2)
 				cv2.rectangle(bo, (x1, y1), (x2, y2), BLUE, cv2.FILLED)
+				cv2.rectangle(bo, (x1, y1), (x2, y2), BLACK, 2)
 		else:
-			cv2.rectangle(bo, (x1, y1), (x2, y2), RED, cv2.FILLED)
+			# diff unrelated to old content
+			cv2.rectangle(bo, (x1, y1), (x2, y2), GREEN, cv2.FILLED)
 
 	alpha = 0.3
 	a = cv2.addWeighted(ao, alpha, a, 1 - alpha, 0)
@@ -245,17 +231,25 @@ def perform_diffing(a, b, write=False):
 	diff_count = len(diffs)
 	print(f'found {diff_count} differences.')
 
+	cv2.waitKey(0)
+
 	if diff_count > 0:
-		if diff_count > 25:
+		while  diff_count > 25:
 			# This is too many diffs. See if we can merge a bunch of them
 			# based on proximity. This will make the diffs "bigger", but
 			# given the number we're already dealing with, that's almost
 			# certainly fine...
 			print(f"too many diffs ({len(diffs)}), attempting to collapse...")
+			prev_count = diff_count
 			diffs = collapse_diffs(a, diffs)
-			print(f"reduced to {len(diffs)} diffs")
+			diff_count = len(diffs)
+			if diff_count == prev_count:
+				break
+		print(f"reduced to {len(diffs)} diffs")
+
 		print('Starting diff highlight...')
 		highlight_diffs(a, b, diffs, write)
+		cv2.waitKey(0)
 
 	else:
 		print("no differences detected")

@@ -20,21 +20,25 @@ run: `./venv/bin/activate`, on windows run: `venv\Scripts\activate`.
 Then to install the dependencies:
 
 ```
-(venv) > pip install -r requirements.txt
+(venv) pip install -r requirements.txt
 ```
 
 
 ## Running a test
 
 1. Create a file called `urls.txt` and put some URLs in it, one URL per line.
-2. To establish your baseline images: `python test.py -l urls.txt --update`
-3. To run subsequent comparisons: `python test.py -l urls.txt`
+2. To establish your baseline images: `(venv) python test.py -l urls.txt --update`
+3. To run subsequent comparisons: `(venv) python test.py -l urls.txt`
 
 
-## getting screenshots
+## getting screenshots a
+
+Use `test.py`. Its help documentation is listed here for convenience, but documentation may go out of date: run `python test.py -h` for its most up to date documentation.
 
 ```
-usage: test.py [-h] [-f FILE] [-w WIDTH] url
+usage: test.py [-h] [-c COMPARE] [-co] [-g GROUND_TRUTH] [-l LIST] [-u]
+               [-w WIDTH]
+               [url]
 
 Take a screenshot of a web page.
 
@@ -43,20 +47,26 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  -f FILE, --file FILE  The file path to save the screenshot to, defaults to
-                        "screenshot.png".
+  -c COMPARE, --compare COMPARE
+                        Save screenshots to the indicated dir. Defaults to
+                        compare.
+  -co, --compare-only   Do not (re)fetch screenshots.
+  -g GROUND_TRUTH, --ground-truth GROUND_TRUTH
+                        Set the ground truth dir. Defaults to main.
+  -l LIST, --list LIST  Read list of URLs to test from a plain text, newline
+                        delimited file.
+  -u, --update          Update the ground truth screenshots.
   -w WIDTH, --width WIDTH
-                        The browser width in pixels, defaults to 1200.
+                        The browser width in pixels. Defaults to 1200.
 ```
-
-this will create three screenshots, one for chrome, firefox,
-and webkit each, with the indicated width (or 1200) in the
-filename.
 
 
 ## diffing images
+
+Use `diff.py`. Its help documentation is listed here for convenience, but documentation may go out of date: run `python diff.py -h` for its most up to date documentation.
+
 ```
-usage: diff.py [-h] [-w WRITE] original new
+usage: diff.py [-h] [-o] [-p MAX_PASSES] [-r RESULT_PATH] [-w] original new
 
 Diff two (bitmap) images.
 
@@ -66,20 +76,17 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  -w WRITE, --write WRITE
-                        write the highlighted images to disk.
+  -o, --match-origin    try to detect relocated content.
+  -p MAX_PASSES, --max-passes MAX_PASSES
+                        the maximum number of diff-merge passes.
+  -r RESULT_PATH, --result-path RESULT_PATH
+                        the maximum number of diff-merge passes.
+  -w, --write           write the highlighted images to disk.
 ```
 
-Note that under no circumstances do you want to use JPG images
-here, because JPG block compression _will_ show up as diff, so
-you end up with a page that, to humans, looks the same, and to
-the computer looks literally 100% different. Not super useful.
-
-- GREEN diff regions are "changed content",
-- RED diff regions are "new content"
-- BLUE diff regions are "moved content"
+Note that under no circumstances do you want to use JPG images here, because JPG block compression _will_ show up as diff, so you end up with a page that, to humans, looks the same, and to the computer looks literally 100% different. Not super useful.
 
 
-## Development
+## Working on the code
 
-See https://github.com/MozillaFoundation/ci-image-diff/projects/1 for the MVP kanban
+See https://github.com/MozillaFoundation/ci-image-diff/projects/1 for the MVP-triaged kanban and https://github.com/MozillaFoundation/ci-image-diff/issues for the full issue list

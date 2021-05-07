@@ -31,7 +31,7 @@ Then to install the dependencies:
 3. To run subsequent comparisons: `(venv) python test.py -l urls.txt`
 
 
-## getting screenshots a
+## Comparing web pages
 
 Use `test.py`. Its help documentation is listed here for convenience, but documentation may go out of date: run `python test.py -h` for its most up to date documentation.
 

@@ -1,8 +1,8 @@
 # ci-image-diff
 
-A visual regression CI solution for web content, based on opencv and playwright
+A visual regression CI solution for web content, based on [opencv](https://opencv.org/) and [playwright](https://playwright.dev/)
 
-This project is still in progress, see https://github.com/MozillaFoundation/ci-image-diff/issues for what's left before v1.0 is ready.
+This project is still in progress, see https://github.com/MozillaFoundation/ci-image-diff/projects/1 for what's left before v1.0 is ready.
 
 ## getting set up
 
@@ -31,7 +31,7 @@ Then to install the dependencies:
 3. To run subsequent comparisons: `(venv) python compare.py -l urls.txt`
 
 
-## getting screenshots a
+## Comparing web pages
 
 Use `compare.py`. Its help documentation is listed here for convenience, but documentation may go out of date: run `python compare.py -h` for its most up to date documentation.
 

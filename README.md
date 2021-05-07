@@ -24,6 +24,13 @@ Then to install the dependencies:
 ```
 
 
+## Running a test
+
+1. Create a file called `urls.txt` and put some URLs in it, one URL per line.
+2. To establish your baseline images: `python test.py -l urls.txt --update`
+3. To run subsequent comparisons: `python test.py -l urls.txt`
+
+
 ## getting screenshots
 
 ```
@@ -68,6 +75,6 @@ here, because JPG block compression _will_ show up as diff, so
 you end up with a page that, to humans, looks the same, and to
 the computer looks literally 100% different. Not super useful.
 
-- GREEN diff regions are "changed content", 
+- GREEN diff regions are "changed content",
 - RED diff regions are "new content"
 - BLUE diff regions are "moved content"

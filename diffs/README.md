@@ -1,7 +1,10 @@
 This directory will contain all diff images,
-housed in dir structures of the form:
+using a path that encodes various aspects of
+the run, using the following format:
 
-./diffs/PR_NUMBER/path/to/page
+```
+./diffs/PR_NUMBER/path/to/page/browser-width.png
+```
 
 The only exception is the ground truth dir,
 which gets built by invoking "test.py" with

@@ -24,7 +24,7 @@ def loadImage(path):
 	try:
 		image = cv2.imread(path, cv2.IMREAD_COLOR)
 		if image is None:
-			raise ValueError(f"{fname} is not an image, or does not exist")
+			raise ValueError(f"{path} is not an image, or does not exist")
 		return image
 	except ValueError:
 		raise ValueError("please use: diff.py [filename] [filename]")
@@ -38,6 +38,11 @@ def compare(how, img1, img2):
 	# full=True gives us both the similarity score and the diff map
 	score, diff = structural_similarity(img1, img2, full=True)
 	diff = (diff * 255).astype("uint8")
+
+	#cv2.namedWindow(f"{how} diff", cv2.WINDOW_NORMAL)
+	#cv2.imshow(f"{how} diff", diff)
+	#cv2.waitKey(0)
+
 	return diff
 
 
@@ -86,7 +91,7 @@ def filter_diffs(diffs):
 	return [e for e in diffs if not_contained(e, diffs)]
 
 
-def collapse_diffs(a, diffs, tolerance=3):
+def collapse_diffs(a, diffs, tolerance=1):
 	"""
 	draw all diffs, dilated by [tolerance], then re-compute the resulting contours
 	"""
@@ -116,35 +121,41 @@ def find_in_original(a, b, area):
 	See if we can find a diff area in the original, because it's possible
 	it simply moved around wholesale, rather than being a changed region.
 	"""
+	w = (area[2] - area[0])
+	h = (area[3] - area[1])
+
+	if w < 5 or h < 5:
+		# There aren't any features to match with on something
+		# that is either too thin or too short..
+		return None
+
 	crop = b[area[1]:area[3], area[0]:area[2]]
 	result = cv2.matchTemplate(crop, a, cv2.TM_CCOEFF_NORMED)
 
 	min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
 	(startX, startY) = max_loc
-	w = (area[2] - area[0])
-	h = (area[3] - area[1])
-	(endX, endY) = (startX + w, startY + h)
 
+	(endX, endY) = (startX + w, startY + h)
 	endX = startX + w
 	endY = startY + h
 	ocrop = a[startY:endY, startX:endX]
 	region = None
 
-	if (w + h <= 10):
-		# in order to check structural_similarity, our crops need to be
-		# at least 7x7, so if they're not we'll use naive MSE instead.
-		region = None
-
-	elif (w + h > 10) and mse_similarity(crop, ocrop) < w * h:
+	if (w + h > 10) and mse_similarity(crop, ocrop) < w * h:
 		# in order to check structural_similarity, our crops need to be
 		# at least 7x7, so if they're not we'll use naive MSE instead.
 		region = [startX, startY, endX, endY]
 
-	elif structural_similarity(gray(ocrop), gray(crop)) >= 0.97:
-		# this basically needs to be a near-perfect match
-		# for us to consider it a "moved" region rather than
-		# a genuine difference between A and B.
-		region = [startX, startY, endX, endY]
+	else:
+		try:
+			if structural_similarity(gray(ocrop), gray(crop)) >= 0.97:
+				# this basically needs to be a near-perfect match
+				# for us to consider it a "moved" region rather than
+				# a genuine difference between A and B.
+				region = [startX, startY, endX, endY]
+		except ValueError as err:
+			print('SSIM error:', area)
+			region = None
 
 	if region is not None:
 		# It's possible that we found something that wasn't moved at all,
@@ -161,7 +172,7 @@ def find_in_original(a, b, area):
 	return region
 
 
-def highlight_diffs(a, b, diffs, write=False):
+def highlight_diffs(a, b, diffs, write=False, result_path='results', match_origin=False):
 	"""
 	Show diff using red highlights for "true diffs", and blue highlights for relocated content.
 	"""
@@ -172,35 +183,44 @@ def highlight_diffs(a, b, diffs, write=False):
 	rcol = 0
 
 	for num, area in enumerate(diffs):
+		print(f"processing diff {num+1} (bbox={area})")
 		x1, y1, x2, y2 = area
-		print(f"processing diff {num+1}")
+		origin = None
 
-		# is this a relocation, or an addition/deletion?
-		origin = find_in_original(a, b, area)
-		if origin is not None:
-			if len(origin) == 0:
-				# this region was effectively a "noop": it's an area that got flagged
-				# as a difference, but the corresponding "original location" is the same
-				# in both images, thus suggesting that we're actually looking at something
-				# that's either whitespace, or something that acts similar to whitespace.
-				pass
+		if match_origin:
+			# is this a relocation, or an addition/deletion?
+			origin = find_in_original(a, b, area)
+			if origin is not None:
+				if len(origin) == 0:
+					# this region was effectively a "noop": it's an area that got flagged
+					# as a difference, but the corresponding "original location" is the same
+					# in both images, thus suggesting that we're actually looking at something
+					# that's either whitespace, or something that acts similar to whitespace.
+					pass
+				else:
+					# If we found this new content somewhere in the old content (with a high
+					# enough confidence) then this is content that got moved rather than being
+					# content that got changed.
+					cv2.rectangle(ao, (origin[0], origin[1]), (origin[2], origin[3]), BLUE, cv2.FILLED)
+					cv2.rectangle(bo, (x1, y1), (x2, y2), BLUE, cv2.FILLED)
 			else:
-				# relocated content
-				cv2.rectangle(ao, (origin[0], origin[1]), (origin[2], origin[3]), BLUE, cv2.FILLED)
-				cv2.rectangle(ao, (origin[0], origin[1]), (origin[2], origin[3]), BLACK, 2)
-				cv2.rectangle(bo, (x1, y1), (x2, y2), BLUE, cv2.FILLED)
-				cv2.rectangle(bo, (x1, y1), (x2, y2), BLACK, 2)
+				# If we cannot find this new content in the old content, this
+				# is a regular old "diff" in that this region of the image has
+				# just changed (for whatever reason)
+				cv2.rectangle(bo, (x1, y1), (x2, y2), GREEN, cv2.FILLED)
 		else:
-			# diff unrelated to old content
+			# Same case as when match_origin can't find matches:
 			cv2.rectangle(bo, (x1, y1), (x2, y2), GREEN, cv2.FILLED)
 
 	alpha = 0.3
 	a = cv2.addWeighted(ao, alpha, a, 1 - alpha, 0)
 	b = cv2.addWeighted(bo, alpha, b, 1 - alpha, 0)
 
+	print('diff pass complete')
+
 	if (write):
-		cv2.imwrite(f'{write}-original.png', a)
-		cv2.imwrite(f'{write}-new.png', b)
+		cv2.imwrite(f'{result_path}/original.png', a)
+		cv2.imwrite(f'{result_path}/new.png', b)
 	else:
 		cv2.imshow("Stock", a)
 		cv2.imshow("Given", b)
@@ -215,7 +235,9 @@ def hue(img):
 	return cv2.cvtColor(img, cv2.COLOR_BGR2HSV)[:,:,0]
 
 
-def perform_diffing(a, b, write=False):
+def perform_diffing(image_pair, write=False, result_path='results', match_origin=True, max_passes=5):
+	(a, b) = image_pair
+
 	print('Running grayscale comparison...')
 	grayDiff = compare("gray", gray(a), gray(b))
 
@@ -224,6 +246,7 @@ def perform_diffing(a, b, write=False):
 
 	diff = cv2.addWeighted(grayDiff, 0.5, hueDiff, 0.5, 0)
 	#cv2.imshow("diff", diff)
+	#cv2.waitKey(0)
 
 	print('Extracting contours...')
 	diffs, tinydiffs = extract_contours(diff)
@@ -231,15 +254,16 @@ def perform_diffing(a, b, write=False):
 	diff_count = len(diffs)
 	print(f'found {diff_count} differences.')
 
-	cv2.waitKey(0)
 
 	if diff_count > 0:
-		while  diff_count > 25:
+		passes = 0
+		while match_origin and diff_count > 25 and passes < max_passes:
 			# This is too many diffs. See if we can merge a bunch of them
 			# based on proximity. This will make the diffs "bigger", but
 			# given the number we're already dealing with, that's almost
 			# certainly fine...
-			print(f"too many diffs ({len(diffs)}), attempting to collapse...")
+			passes += 1
+			print(f"too many diffs, attempting to collapse (pass {passes})...")
 			prev_count = diff_count
 			diffs = collapse_diffs(a, diffs)
 			diff_count = len(diffs)
@@ -248,8 +272,7 @@ def perform_diffing(a, b, write=False):
 		print(f"reduced to {len(diffs)} diffs")
 
 		print('Starting diff highlight...')
-		highlight_diffs(a, b, diffs, write)
-		cv2.waitKey(0)
+		highlight_diffs(a, b, diffs, write, result_path, match_origin)
 
 	else:
 		print("no differences detected")
@@ -268,4 +291,4 @@ def make_same_size(a, b):
 			b = b[:, 0:w1]
 		else:
 			a = a[:, 0:w2]
-	return a, b
+	return (a, b, )

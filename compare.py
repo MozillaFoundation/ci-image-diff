@@ -1,5 +1,5 @@
 """
-Test script requires:
+Compare script requires:
 
 - argparse
 - playwright

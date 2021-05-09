@@ -37,11 +37,10 @@ function buildImage(browserWidth, diff) {
   };
 }
 
-function buildImageElement(screenshot, overlay, classes='', width = '40%') {
+function buildImageElement(screenshot, overlay, classes='') {
   const figure = document.createElement(`figure`);
   figure.setAttribute(`style`, `
     background-image: url("${screenshot}");
-    width: 50%;
   `);
 
   const img = new Image();

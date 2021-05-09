@@ -7,6 +7,7 @@ section figure {
   background-position: 0 0;
   background-size: 100% 100%;
   display: inline-block;
+  width: 49%;
   margin: 0;
   padding: 0;
 }
@@ -15,6 +16,10 @@ section figure img {
   margin: 0;
   padding: 0;
   opacity: 0;
+}
+
+section figure + figure {
+  margin-left: 1%;
 }
 
 @keyframes pulse {

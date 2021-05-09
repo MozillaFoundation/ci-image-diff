@@ -141,32 +141,17 @@ def find_in_original(a, b, area):
 	ocrop = a[startY:endY, startX:endX]
 	region = None
 
-	if (w + h > 10) and mse_similarity(crop, ocrop) < w * h:
-		# in order to check structural_similarity, our crops need to be
-		# at least 7x7, so if they're not we'll use naive MSE instead.
+	if w > 3 and h > 3 and (w > 6 or h > 6) and mse_similarity(crop, ocrop) == 0:
+		# Since we're looking for relocations using bitmap images,
+		# we only accept regions as being "relocations" if they are
+		# a perfect match between source and target.
 		region = [startX, startY, endX, endY]
 
-	else:
-		try:
-			if structural_similarity(gray(ocrop), gray(crop)) >= 0.97:
-				# this basically needs to be a near-perfect match
-				# for us to consider it a "moved" region rather than
-				# a genuine difference between A and B.
-				region = [startX, startY, endX, endY]
-		except ValueError as err:
-			print('SSIM error:', area)
-			region = None
-
-	if region is not None:
-		# It's possible that we found something that wasn't moved at all,
-		# such as an area of whitespace, in which there will not be a diff
-		# between A and B for the found region. If so, we return None
-		ocrop = a[startY:endY, startX:endX]
+		# Because templateMatch does not find a match "closest to" the area
+		# we care about, we need to make sure that if there is a templateMatch,
+		# the same crop region in A and B are actually different.
 		crop = b[startY:endY, startX:endX]
-		diff = mse_similarity(gray(ocrop), gray(crop))
-		if diff == 0:
-			# both old and new have the same data for the same crop
-			# region: this isn't actually a diff at all.
+		if mse_similarity(ocrop, crop) == 0:
 			region = []
 
 	return region

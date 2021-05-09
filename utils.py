@@ -244,15 +244,17 @@ def perform_diffing(image_pair, write=False, result_path='results', match_origin
 	hueDiff = compare("hue", hue(a), hue(b))
 
 	diff = cv2.addWeighted(grayDiff, 0.5, hueDiff, 0.5, 0)
-	#cv2.imshow("diff", diff)
-	#cv2.waitKey(0)
+
+	print('Contrast-boosting diff...')
+	diff = cv2.cvtColor(diff, cv2.COLOR_GRAY2BGR)
+	diff[np.where((diff<[254,254,254]).all(axis=2))] = [0,0,0]
+	diff = cv2.cvtColor(diff, cv2.COLOR_BGR2GRAY)
 
 	print('Extracting contours...')
 	diffs, tinydiffs = extract_contours(diff)
 	diffs.extend(tinydiffs)
 	diff_count = len(diffs)
 	print(f'found {diff_count} differences.')
-
 
 	if diff_count > 0:
 		passes = 0

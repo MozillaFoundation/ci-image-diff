@@ -18,17 +18,16 @@ from distutils.dir_util import copy_tree
 from shutil import copyfile
 from playwright.async_api import async_playwright
 
-import importlib
-utils = importlib.import_module('utils')
 
 parser = argparse.ArgumentParser(description='Take a screenshot of a web page.')
 parser.add_argument('url', nargs='?', help='The URL for the web page.')
 parser.add_argument('-b', '--base-dir', default='diffs', help='Directory for diffs. Defaults to diffs.')
-parser.add_argument('-r', '--result-dir', default='results', help='Directory for comparison results. Defaults to results.')
 parser.add_argument('-c', '--compare', default='compare', help='Save screenshots to the indicated dir. Defaults to compare.')
 parser.add_argument('-co', '--compare-only', action='store_true', help='Do not (re)fetch screenshots.')
 parser.add_argument('-g', '--ground-truth', default='main', help='Set the ground truth dir. Defaults to main.')
 parser.add_argument('-l', '--list', help='Read list of URLs to test from a plain text, newline delimited file.')
+parser.add_argument('-o', '--match-origin', action='store_true', help='Try to detect relocated content.')
+parser.add_argument('-r', '--result-dir', default='results', help='Directory for comparison results. Defaults to results.')
 parser.add_argument('-u', '--update', action='store_true', help='Update the ground truth screenshots.')
 parser.add_argument('-w', '--width', type=int, default='1200', help='The browser width in pixels. Defaults to 1200.')
 args = parser.parse_args()
@@ -51,34 +50,51 @@ def path_safe(str):
     return str.replace(':', '-').replace('@','-')
 
 
-async def capture_screenshots_for(p, browser_type, urls, url_paths, asyncio_queue):
+async def capture_screenshot_for_url(p, browser, browser_type, url_path, page_url):
+    browser_name = browser_type.name
+
+    print(f'Navigating to {page_url} using {browser_name}, url_path:', url_path)
+    page = await browser.new_page()
+    await page.set_viewport_size({ 'width': args.width, 'height': 800 })
+    await page.goto(page_url)
+
+    # It would be lovely if Webkit actually, you know, worked like everything else...
+    wait_type = 'networkidle' if browser_type is not p.webkit else 'domcontentloaded'
+    await page.wait_for_load_state(wait_type)
+
+    # Figure out which path we need to write to, and ensure the dir for that exists.
+    parent = f'./diffs/{screenshot_base_dir}/{browser_name}-{args.width}/{url_path}'
+    Path(parent).mkdir(parents=True, exist_ok=True)
+    image_path = f'{parent}/screenshot.png'
+
+    print(f'Creating {image_path}')
+    await page.screenshot(path=image_path, full_page=True)
+
+
+async def capture_screenshots_for(p, browser_type, urls, url_paths):
     browser_name = browser_type.name
     browser = await browser_type.launch(headless=True)
 
-    print(f'Starting captures for {browser_name}')
-
+    print(f'Initialising captures for {browser_name}')
+    screenshot_queue = asyncio.Queue()
+    screenshot_tasks = []
     for (i, page_url) in enumerate(url_list):
-        url_path = path_safe(url_paths[i])
-        print(f'Navigating to {page_url} using {browser_name}, url_path:', url_path)
-        page = await browser.new_page()
-        await page.set_viewport_size({ 'width': args.width, 'height': 800 })
-        await page.goto(page_url)
+        task = asyncio.create_task(
+            capture_screenshot_for_url(
+                p,
+                browser,
+                browser_type,
+                path_safe(url_paths[i]),
+                page_url,
+            )
+        )
+        screenshot_tasks.append(task)
 
-        # It would be lovely if Webkit actually, you know, worked like everything else...
-        wait_type = 'networkidle' if browser_type is not p.webkit else 'domcontentloaded'
-        await page.wait_for_load_state(wait_type)
-
-        # Figure out which path we need to write to, and ensure the dir for that exists.
-        parent = f'./diffs/{screenshot_base_dir}/{browser_name}-{args.width}/{url_path}'
-        Path(parent).mkdir(parents=True, exist_ok=True)
-        image_path = f'{parent}/screenshot.png'
-
-        print(f'Creating {image_path}')
-        await page.screenshot(path=image_path, full_page=True)
-
+    print(f'Starting {len(screenshot_tasks)} captures')
+    await screenshot_queue.join()
+    await asyncio.gather(*screenshot_tasks, return_exceptions=True)
     await browser.close()
     print(f'Fininshed capturing for {browser_name}')
-    asyncio_queue.task_done()
 
 
 async def capture_screenshots(urls):
@@ -97,7 +113,14 @@ async def capture_screenshots(urls):
             tasks = []
 
             for browser_type in browsers:
-                task = asyncio.create_task(capture_screenshots_for(p, browser_type, urls, url_paths, asyncio_queue))
+                task = asyncio.create_task(
+                    capture_screenshots_for(
+                        p,
+                        browser_type,
+                        urls,
+                        url_paths
+                    )
+                )
                 tasks.append(task)
 
             print('Starting captures')
@@ -112,7 +135,7 @@ async def capture_screenshots(urls):
 
             for browser_type in browsers:
                 key = f'{browser_type.name}-{args.width}'
-                report[key] = compare_screenshots(
+                report[key] = await compare_screenshots(
                     args.base_dir,
                     args.result_dir,
                     args.ground_truth,
@@ -130,30 +153,50 @@ async def capture_screenshots(urls):
 
             if failures > 0:
                 print(f'Visual diffs found for {failures} screenshots')
+                print(f'run:\n    python -m http.server --directory {args.result_dir} 8080')
+                print(f'then open:\n    rhttp://localhost:8080/?reference={args.ground_truth}&compare={args.compare}')
                 sys.exit(failures)
 
 
-def compare_screenshots(base_dir, result_dir, ground_truth_dir, compare_dir, url_paths, browser_name, width):
+
+async def call_diff_script(base_dir, result_dir, ground_truth_dir, compare_dir, url_path, browser_name, width, failures):
+    url_path = path_safe(url_path)
+
+    image_path = f'{browser_name}-{width}/{url_path}/screenshot.png'
+    ground_truth = f'./{base_dir}/{ground_truth_dir}/{image_path}'
+    compare = f'./{base_dir}/{compare_dir}/{image_path}'
+
+    result_path = f'./{result_dir}/{compare_dir}/{browser_name}-{width}/{url_path}'
+    Path(result_path).mkdir(parents=True, exist_ok=True)
+    cmd = f'{sys.executable} diff.py -w -r {result_path} {ground_truth} {compare}'
+
+    if args.match_origin:
+        cmd = f'{cmd} -o'
+
+    print(f'\ncalling {cmd}')
+    return_code = os.system(cmd)
+    if return_code != 0:
+        copyfile(compare, compare.replace(f'{base_dir}/', f'{result_dir}/'))
+        failures.append(url_path)
+
+
+async def compare_screenshots(base_dir, result_dir, ground_truth_dir, compare_dir, url_paths, browser_name, width):
     failures = list()
 
     copy_tree(f'./{base_dir}/{ground_truth_dir}', f'./{result_dir}/{ground_truth_dir}')
 
+    print('Running diff scripts')
     for url_path in url_paths:
-        url_path = path_safe(url_path)
-
-        image_path = f'{browser_name}-{width}/{url_path}/screenshot.png'
-        ground_truth = f'./{base_dir}/{ground_truth_dir}/{image_path}'
-        compare = f'./{base_dir}/{compare_dir}/{image_path}'
-
-        result_path = f'./{result_dir}/{compare_dir}/{browser_name}-{width}/{url_path}'
-        Path(result_path).mkdir(parents=True, exist_ok=True)
-        cmd = f'{sys.executable} diff.py -w -r {result_path} {ground_truth} {compare}'
-
-        print(f'calling {cmd}')
-        return_code = os.system(cmd)
-        if return_code != 0:
-            copyfile(compare, compare.replace(f'{base_dir}/', f'{result_dir}/'))
-            failures.append(url_path)
+        await call_diff_script(
+            base_dir,
+            result_dir,
+            ground_truth_dir,
+            compare_dir,
+            url_path,
+            browser_name,
+            width,
+            failures,
+        )
 
     return failures
 

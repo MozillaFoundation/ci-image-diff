@@ -25,5 +25,5 @@ image_pair = utils.make_same_size(
 diffs = utils.perform_diffing(image_pair, args.write, args.result_path, args.match_origin, args.max_passes)
 
 if diffs is not None:
-	print(f'{len(diffs)} found.')
+	print(f'{len(diffs)} differences found.')
 	sys.exit(1)

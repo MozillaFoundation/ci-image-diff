@@ -3,7 +3,7 @@ html, body {
     color: #FDFDFD;
 }
 
-figure {
+section figure {
   background-position: 0 0;
   background-size: 100% 100%;
   display: inline-block;
@@ -11,17 +11,27 @@ figure {
   padding: 0;
 }
 
-figure img {
+section figure img {
   margin: 0;
   padding: 0;
   opacity: 0;
-  transition: opacity 0.5s ease-in-out;
 }
 
-figure:hover img {
-  opacity: 1;
+@keyframes pulse {
+  0% {
+    opacity: 0;
+  }
+  25% {
+    opacity: 0;
+  }
+  75% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0.9;
+  }
 }
 
-figure figcaption {
-    display: none;
+section:hover figure img {
+  animation: pulse 2s ease-in-out infinite alternate;
 }

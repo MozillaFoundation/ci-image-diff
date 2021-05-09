@@ -32,21 +32,22 @@ function buildImage(browserWidth, diff) {
 
   return {
     diff: diff,
-    original: buildImageElement(original, originalMask),
-    compare: buildImageElement(compare, diffMask),
+    original: buildImageElement(original, originalMask, "reference"),
+    compare: buildImageElement(compare, diffMask, "compare"),
   };
 }
 
-function buildImageElement(screenshot, overlay, height = 500) {
+function buildImageElement(screenshot, overlay, classes='', width = '40%') {
   const figure = document.createElement(`figure`);
   figure.setAttribute(`style`, `
     background-image: url("${screenshot}");
-    height: ${height}px;
+    width: 50%;
   `);
 
   const img = new Image();
   img.src = overlay;
-  img.height = height;
+  img.style.width = `100%`;
+  img.classList.add(classes);
   figure.append(img);
   return figure;
 }

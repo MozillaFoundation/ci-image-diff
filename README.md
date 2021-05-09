@@ -36,9 +36,9 @@ Then to install the dependencies:
 Use `compare.py`. Its help documentation is listed here for convenience, but documentation may go out of date: run `python compare.py -h` for its most up to date documentation.
 
 ```
-usage: compare.py [-h] [-c COMPARE] [-co] [-g GROUND_TRUTH] [-l LIST] [-u]
-               [-w WIDTH]
-               [url]
+usage: compare.py [-h] [-b BASE_DIR] [-c COMPARE] [-co] [-g GROUND_TRUTH]
+                  [-l LIST] [-o] [-r RESULT_DIR] [-u] [-w WIDTH]
+                  [url]
 
 Take a screenshot of a web page.
 
@@ -47,6 +47,8 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
+  -b BASE_DIR, --base-dir BASE_DIR
+                        Directory for diffs. Defaults to diffs.
   -c COMPARE, --compare COMPARE
                         Save screenshots to the indicated dir. Defaults to
                         compare.
@@ -55,6 +57,9 @@ optional arguments:
                         Set the ground truth dir. Defaults to main.
   -l LIST, --list LIST  Read list of URLs to test from a plain text, newline
                         delimited file.
+  -o, --match-origin    Try to detect relocated content.
+  -r RESULT_DIR, --result-dir RESULT_DIR
+                        Directory for comparison results. Defaults to results.
   -u, --update          Update the ground truth screenshots.
   -w WIDTH, --width WIDTH
                         The browser width in pixels. Defaults to 1200.

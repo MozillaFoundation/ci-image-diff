@@ -152,9 +152,9 @@ async def capture_screenshots(urls):
             result_file.close()
 
             if failures > 0:
-                print(f'Visual diffs found for {failures} screenshots')
+                print(f'\nVisual diffs found in {failures} screenshots')
                 print(f'run:\n    python -m http.server --directory {args.result_dir} 8080')
-                print(f'then open:\n    rhttp://localhost:8080/?reference={args.ground_truth}&compare={args.compare}')
+                print(f'then open:\n    http://localhost:8080/?reference={args.ground_truth}&compare={args.compare}')
                 sys.exit(failures)
 
 

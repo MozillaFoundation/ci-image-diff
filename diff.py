@@ -3,6 +3,7 @@ In order to get meaningful diffs, do not feed this JPEG images. The block compre
 to flag about a million differences that aren't actually there. Use a bitmap format like PNG.
 """
 
+import sys
 import argparse
 import importlib
 utils = importlib.import_module('utils')
@@ -21,4 +22,8 @@ image_pair = utils.make_same_size(
 	utils.loadImage(args.new)
 )
 
-utils.perform_diffing(image_pair, args.write, args.result_path, args.match_origin, args.max_passes)
+diffs = utils.perform_diffing(image_pair, args.write, args.result_path, args.match_origin, args.max_passes)
+
+if diffs is not None:
+	print(f'{len(diffs)} found.')
+	sys.exit(1)

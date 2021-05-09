@@ -10,7 +10,14 @@ venv
 # we do want to make sure that README.md is there.
 diffs/**/*
 !diffs/README.md
+
+# Nor comparison results, but we DO want to preserve the
+# comparison HTML/JS/CSS because that's needed to view.
 results/**/*
+!results/index.*
 
 # Ignore any .txt file used for URL list testing
 *.txt
+
+# No reason to check in a transient tasklist
+TODO.md

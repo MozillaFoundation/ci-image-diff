@@ -1,0 +1,27 @@
+html, body {
+    background: #333;
+    color: #FDFDFD;
+}
+
+figure {
+  background-position: 0 0;
+  background-size: 100% 100%;
+  display: inline-block;
+  margin: 0;
+  padding: 0;
+}
+
+figure img {
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 0.5s ease-in-out;
+}
+
+figure:hover img {
+  opacity: 1;
+}
+
+figure figcaption {
+    display: none;
+}

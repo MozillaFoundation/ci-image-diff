@@ -24,7 +24,7 @@ def loadImage(path):
 	try:
 		image = cv2.imread(path, cv2.IMREAD_COLOR)
 		if image is None:
-			raise ValueError(f"{path} is not an image, or does not exist")
+			raise ValueError(f'{path} is not an image, or does not exist')
 		return image
 	except ValueError:
 		raise ValueError("please use: diff.py [filename] [filename]")
@@ -39,8 +39,8 @@ def compare(how, img1, img2):
 	score, diff = structural_similarity(img1, img2, full=True)
 	diff = (diff * 255).astype("uint8")
 
-	#cv2.namedWindow(f"{how} diff", cv2.WINDOW_NORMAL)
-	#cv2.imshow(f"{how} diff", diff)
+	#cv2.namedWindow(f'{how} diff', cv2.WINDOW_NORMAL)
+	#cv2.imshow(f'{how} diff', diff)
 	#cv2.waitKey(0)
 
 	return diff
@@ -177,13 +177,16 @@ def highlight_diffs(a, b, diffs, write=False, result_path='results', match_origi
 	Show diff using red highlights for "true diffs", and blue highlights for relocated content.
 	"""
 
-	ao = a.copy()
-	bo = b.copy()
+	# If there are "relocations" we want to highlight those in the original image
+	original_mask = a.copy()
+	original_mask[:] = (255, 255, 255)
 
-	rcol = 0
+	# For non-relocation diffs we build a mask, instead.
+	diff_mask = b.copy()
+	diff_mask[:] = (255, 255, 255)
 
 	for num, area in enumerate(diffs):
-		print(f"processing diff {num+1} (bbox={area})")
+		print(f'processing diff {num+1} (bbox={area})')
 		x1, y1, x2, y2 = area
 		origin = None
 
@@ -201,29 +204,25 @@ def highlight_diffs(a, b, diffs, write=False, result_path='results', match_origi
 					# If we found this new content somewhere in the old content (with a high
 					# enough confidence) then this is content that got moved rather than being
 					# content that got changed.
-					cv2.rectangle(ao, (origin[0], origin[1]), (origin[2], origin[3]), BLUE, cv2.FILLED)
-					cv2.rectangle(bo, (x1, y1), (x2, y2), BLUE, cv2.FILLED)
+					cv2.rectangle(original_mask, (origin[0], origin[1]), (origin[2], origin[3]), BLUE, cv2.FILLED)
+					cv2.rectangle(diff_mask, (x1, y1), (x2, y2), BLUE, cv2.FILLED)
 			else:
 				# If we cannot find this new content in the old content, this
 				# is a regular old "diff" in that this region of the image has
 				# just changed (for whatever reason)
-				cv2.rectangle(bo, (x1, y1), (x2, y2), GREEN, cv2.FILLED)
+				cv2.rectangle(diff_mask, (x1, y1), (x2, y2), GREEN, cv2.FILLED)
 		else:
 			# Same case as when match_origin can't find matches:
-			cv2.rectangle(bo, (x1, y1), (x2, y2), GREEN, cv2.FILLED)
-
-	alpha = 0.3
-	a = cv2.addWeighted(ao, alpha, a, 1 - alpha, 0)
-	b = cv2.addWeighted(bo, alpha, b, 1 - alpha, 0)
+			cv2.rectangle(diff_mask, (x1, y1), (x2, y2), GREEN, cv2.FILLED)
 
 	print('diff pass complete')
 
 	if (write):
-		cv2.imwrite(f'{result_path}/original.png', a)
-		cv2.imwrite(f'{result_path}/new.png', b)
+		cv2.imwrite(f'{result_path}/original_mask.png', original_mask)
+		cv2.imwrite(f'{result_path}/diff_mask.png', diff_mask)
 	else:
-		cv2.imshow("Stock", a)
-		cv2.imshow("Given", b)
+		cv2.imshow("Stock", original_mask)
+		cv2.imshow("Given", diff_mask)
 		cv2.waitKey(0)
 
 
@@ -263,19 +262,20 @@ def perform_diffing(image_pair, write=False, result_path='results', match_origin
 			# given the number we're already dealing with, that's almost
 			# certainly fine...
 			passes += 1
-			print(f"too many diffs, attempting to collapse (pass {passes})...")
+			print(f'too many diffs, attempting to collapse (pass {passes})...')
 			prev_count = diff_count
 			diffs = collapse_diffs(a, diffs)
 			diff_count = len(diffs)
 			if diff_count == prev_count:
 				break
-		print(f"reduced to {len(diffs)} diffs")
+		print(f'reduced to {len(diffs)} diffs')
 
 		print('Starting diff highlight...')
 		highlight_diffs(a, b, diffs, write, result_path, match_origin)
+		return diffs
 
 	else:
-		print("no differences detected")
+		print('no differences detected')
 
 
 def make_same_size(a, b):

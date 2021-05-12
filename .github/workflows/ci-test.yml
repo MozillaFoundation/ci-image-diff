@@ -15,7 +15,7 @@ jobs:
         python-version: 3.7.7
     - name: Install Python Dependencies
       run: pip install -r requirements.txt
-    - name: Testing
-      run: |
-        python compare.py -g master --update https://stackoverflow.com/questions
-        python compare.py -g master -c testname https://stackoverflow.com/questions
+    - name: Establishing baseline
+      run: python compare.py -g master --update https://stackoverflow.com/questions
+    - name: Diff testing
+      run: python compare.py -g master -c testname https://stackoverflow.com/questions

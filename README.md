@@ -95,3 +95,118 @@ Note that under no circumstances do you want to use JPG images here, because JPG
 ## Working on the code
 
 See https://github.com/MozillaFoundation/ci-image-diff/projects/1 for the MVP-triaged kanban and https://github.com/MozillaFoundation/ci-image-diff/issues for the full issue list
+
+
+## Using ci-image-diff in Github Actions
+
+Github actions are rather useful. We recommend creating two new `.github/workflows` task files,
+
+1. one task for ensuring your baseline images are always up to date, tied to code getting merged into `main`, and
+2. one task for performing visual diffing against `main` as part of your PR review process.
+
+### (1) Keeping your baseline up to date
+
+The following example assumes you use AWS S3 as the place to house your baseline images, as well as any PR-associated diff sets for inspection.
+
+Remember that this really is an example: you're going to have to tailor it to your own use until such time as we turn this into its own github-action that can be referenced via a `uses`/`with` section.
+
+```
+name: Visual Diff Sync
+
+on:
+  push:
+    branches: [ 'main' ]
+
+jobs:
+  update-baseline:
+    name: CI Image Diff
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_FOR_VISUAL_CI }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_FOR_VISUAL_CI }}
+        aws-region: your-aws-s3-region-indicator
+    - uses: actions/setup-python@v2
+      with:
+        python-version: 3.7 or higher
+    - name: Installing git
+      run: sudo apt-get install git
+    - name: Fetching ci-image-diff
+      run: |
+        git clone https://github.com/MozillaFoundation/ci-image-diff
+        cd ci-image-diff
+        pip install -r requirements.txt
+        playwright install
+        cd ..
+    - name: Starting your build and server etc
+      run: |
+        ...
+        ...
+        ...
+    - name: Establish or update the baseline
+      run: |
+        cd ci-image-diff
+        python compare.py --update -l urls.txt
+    - name: Upload baseline to AWS S3
+      run: aws s3 sync ./diffs/main s3://${{ secrets.AWS_BUCKET_NAME_FOR_VISUAL_CI }}/baseline --acl public-read --delete
+```
+
+### (2) Performing visual diffing against your baseline for incoming PRs
+
+With a baseline established, we can run visual diffing as part of the PR process:
+
+```
+name: Visual Regression Testing
+
+on:
+  pull_request:
+    branches: [ 'main' ]
+
+jobs:
+  ci_image_diff:
+    name: CI Image Diff
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_FOR_VISUAL_CI }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_FOR_VISUAL_CI }}
+    - name: Extract branch name
+      shell: bash
+      run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/})"
+      id: extract_branch
+    - uses: actions/setup-python@v2
+      with:
+        python-version: 3.7 or higher
+    - name: Installing git
+      run: sudo apt-get install git
+    - name: Fetching ci-image-diff
+      run: |
+        git clone https://github.com/MozillaFoundation/ci-image-diff
+        cd ci-image-diff
+        pip install -r requirements.txt
+        playwright install
+        cd ..
+    - name: Starting your build and server etc
+      run: |
+        ...
+        ...
+        ...
+    - name: Downloading visual diffing baseline
+      run: aws s3 sync s3://ci-image-diff/baseline ./diffs/main
+    - name: Testing for visual regressions
+      run: python compare.py -o https://stackoverflow.com/questions
+    - name: Uploading diffs to AWS S3
+      if: always()
+      run: aws s3 sync ./results/ s3://YOUR-BUCKET-NAME-HERE/${{ steps.extract_branch.outputs.branch }} --acl public-read --delete
+    - name: What is the diff viewer URL for this PR?
+      if: always()
+      run: echo "https://YOUR-BUCKET-NAME-HERE.s3-your-aws-s3-region-indicator.amazonaws.com/${{ steps.extract_branch.outputs.branch }}/index.html?reference=main&compare=compare"
+```
+
+This will download the baseline we established earlier, and compare it to this PR's codebase results, then upload it to S3 so that any diffs can be inspected on the URL that the "what is the diff viewer URL" task echos.

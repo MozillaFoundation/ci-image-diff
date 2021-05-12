@@ -1,11 +1,12 @@
-name: Visual Regression Testing
+name: Visual Diff sync
 
 on:
-  pull_request:
-    branches: [ 'master' ]
+  push:
+    branches:
+      - master
 
 jobs:
-  ci_image_diff:
+  update-baseline:
     name: CI Image Diff
     runs-on: ubuntu-latest
     steps:
@@ -21,19 +22,14 @@ jobs:
       run: pip install -r requirements.txt
     - name: Running playwright's install
       run: playwright install
+    - name: Establishing baseline
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
         aws-secret-access-key: ${{ secrets.AWS_ACCESS_SECRET }}
         aws-region: us-west-2
-    - name: Establishing baseline
       run: python compare.py --update https://stackoverflow.com/questions
-    - name: Diff testing
-      run: python compare.py -o https://stackoverflow.com/questions
-    - name: Upload diffs to AWS S3
+    - name: Upload baseline to AWS S3
       if: always()
-      run: aws s3 sync ./results/ s3://ci-image-diff/${{ steps.extract_branch.outputs.branch }} --acl public-read --delete
-    - name: What is the diff viewer URL for this PR?
-      if: always()
-      run: echo "https://ci-image-diff.s3-us-west-2.amazonaws.com/${{ steps.extract_branch.outputs.branch }}/index.html?reference=main&compare=compare"
+      run: aws s3 sync ./diffs/main s3://ci-image-diff/baseline --acl public-read --delete

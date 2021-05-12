@@ -204,4 +204,4 @@ async def compare_screenshots(base_dir, result_dir, ground_truth_dir, compare_di
 if len(url_list) == 0:
     parser.print_help()
 else:
-    asyncio.run_until_complete((capture_screenshots(url_list))
+    asyncio.run_until_complete(capture_screenshots(url_list))

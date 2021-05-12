@@ -97,6 +97,47 @@ async def capture_screenshots_for(p, browser_type, urls, url_paths):
     print(f'Fininshed capturing for {browser_name}')
 
 
+async def call_diff_script(base_dir, result_dir, ground_truth_dir, compare_dir, url_path, browser_name, width, failures):
+    url_path = path_safe(url_path)
+
+    image_path = f'{browser_name}-{width}/{url_path}/screenshot.png'
+    ground_truth = f'./{base_dir}/{ground_truth_dir}/{image_path}'
+    compare = f'./{base_dir}/{compare_dir}/{image_path}'
+
+    result_path = f'./{result_dir}/{compare_dir}/{browser_name}-{width}/{url_path}'
+    Path(result_path).mkdir(parents=True, exist_ok=True)
+    cmd = f'{sys.executable} diff.py -w -r {result_path} {ground_truth} {compare}'
+
+    if args.match_origin:
+        cmd = f'{cmd} -o'
+
+    print(f'\ncalling {cmd}')
+    return_code = os.system(cmd)
+    if return_code != 0:
+        copyfile(compare, compare.replace(f'{base_dir}/', f'{result_dir}/'))
+        failures.append(url_path)
+
+
+async def compare_screenshots(base_dir, result_dir, ground_truth_dir, compare_dir, url_paths, browser_name, width):
+    failures = list()
+
+    copy_tree(f'./{base_dir}/{ground_truth_dir}', f'./{result_dir}/{ground_truth_dir}')
+
+    print('Running diff scripts')
+    for url_path in url_paths:
+        await call_diff_script(
+            base_dir,
+            result_dir,
+            ground_truth_dir,
+            compare_dir,
+            url_path,
+            browser_name,
+            width,
+            failures,
+        )
+
+    return failures
+
 async def capture_screenshots(urls):
     """
     Perform capturing in parallel, so that all browsers can
@@ -158,50 +199,7 @@ async def capture_screenshots(urls):
                 sys.exit(failures)
 
 
-
-async def call_diff_script(base_dir, result_dir, ground_truth_dir, compare_dir, url_path, browser_name, width, failures):
-    url_path = path_safe(url_path)
-
-    image_path = f'{browser_name}-{width}/{url_path}/screenshot.png'
-    ground_truth = f'./{base_dir}/{ground_truth_dir}/{image_path}'
-    compare = f'./{base_dir}/{compare_dir}/{image_path}'
-
-    result_path = f'./{result_dir}/{compare_dir}/{browser_name}-{width}/{url_path}'
-    Path(result_path).mkdir(parents=True, exist_ok=True)
-    cmd = f'{sys.executable} diff.py -w -r {result_path} {ground_truth} {compare}'
-
-    if args.match_origin:
-        cmd = f'{cmd} -o'
-
-    print(f'\ncalling {cmd}')
-    return_code = os.system(cmd)
-    if return_code != 0:
-        copyfile(compare, compare.replace(f'{base_dir}/', f'{result_dir}/'))
-        failures.append(url_path)
-
-
-async def compare_screenshots(base_dir, result_dir, ground_truth_dir, compare_dir, url_paths, browser_name, width):
-    failures = list()
-
-    copy_tree(f'./{base_dir}/{ground_truth_dir}', f'./{result_dir}/{ground_truth_dir}')
-
-    print('Running diff scripts')
-    for url_path in url_paths:
-        await call_diff_script(
-            base_dir,
-            result_dir,
-            ground_truth_dir,
-            compare_dir,
-            url_path,
-            browser_name,
-            width,
-            failures,
-        )
-
-    return failures
-
-
 if len(url_list) == 0:
     parser.print_help()
 else:
-    asyncio.run_until_complete(capture_screenshots(url_list))
+    asyncio.run(capture_screenshots(url_list))

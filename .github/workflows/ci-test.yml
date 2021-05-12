@@ -1,0 +1,21 @@
+name: Visual Regression Testing
+
+on:
+  pull_request:
+    branches: [ 'master' ]
+
+jobs:
+  ci_image_diff:
+    name: CI Image Diff
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+      with:
+        python-version: 3.7.7
+    - name: Install Python Dependencies
+      run: pip install -r requirements.txt
+    - name: Testing
+      run: |
+        python compare.py -g master --update https://stackoverflow.com/questions
+        python compare.py -g master -c testname https://stackoverflow.com/questions

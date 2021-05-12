@@ -11,10 +11,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Extract branch name
-      shell: bash
-      run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/})"
-      id: extract_branch
     - uses: actions/setup-python@v2
       with:
         python-version: 3.7.7
@@ -23,6 +19,7 @@ jobs:
     - name: Running playwright's install
       run: playwright install
     - name: Establishing baseline
+      run: python compare.py --update https://stackoverflow.com/questions
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:

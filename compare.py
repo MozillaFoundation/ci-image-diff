@@ -14,8 +14,8 @@ import argparse
 import asyncio
 
 from pathlib import Path
-from distutils.dir_util import copy_tree
 from shutil import copyfile
+from distutils.dir_util import copy_tree
 from playwright.async_api import async_playwright
 
 
@@ -76,7 +76,6 @@ async def capture_screenshots_for(p, browser_type, urls, url_paths):
     browser = await browser_type.launch(headless=True)
 
     print(f'Initialising captures for {browser_name}')
-    screenshot_queue = asyncio.Queue()
     screenshot_tasks = []
     for (i, page_url) in enumerate(url_list):
         task = asyncio.create_task(
@@ -91,7 +90,6 @@ async def capture_screenshots_for(p, browser_type, urls, url_paths):
         screenshot_tasks.append(task)
 
     print(f'Starting {len(screenshot_tasks)} captures')
-    await screenshot_queue.join()
     await asyncio.gather(*screenshot_tasks, return_exceptions=True)
     await browser.close()
     print(f'Fininshed capturing for {browser_name}')
@@ -150,7 +148,6 @@ async def capture_screenshots(urls):
         url_paths = [url_stripper.sub('', u.strip()).strip('/') for u in url_list]
 
         if not args.compare_only:
-            asyncio_queue = asyncio.Queue()
             tasks = []
 
             for browser_type in browsers:
@@ -165,8 +162,8 @@ async def capture_screenshots(urls):
                 tasks.append(task)
 
             print('Starting captures')
-            await asyncio_queue.join()
             await asyncio.gather(*tasks, return_exceptions=True)
+            print('Finished captures:')
 
         # TODO: we can almost certainly parallelise all diffing tasks
         if not args.update:

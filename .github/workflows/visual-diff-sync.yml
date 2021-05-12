@@ -1,0 +1,35 @@
+name: Visual Diff sync
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  update-baseline:
+    name: CI Image Diff
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Extract branch name
+      shell: bash
+      run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/})"
+      id: extract_branch
+    - uses: actions/setup-python@v2
+      with:
+        python-version: 3.7.7
+    - name: Install Python Dependencies
+      run: pip install -r requirements.txt
+    - name: Running playwright's install
+      run: playwright install
+    - name: Establishing baseline
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+        aws-secret-access-key: ${{ secrets.AWS_ACCESS_SECRET }}
+        aws-region: us-west-2
+      run: python compare.py --update https://stackoverflow.com/questions
+    - name: Upload baseline to AWS S3
+      if: always()
+      run: aws s3 sync ./diffs/main s3://ci-image-diff/baseline --acl public-read --delete

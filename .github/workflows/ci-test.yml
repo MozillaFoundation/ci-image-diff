@@ -1,0 +1,39 @@
+name: Visual Regression Testing
+
+on:
+  pull_request:
+    branches: [ 'master' ]
+
+jobs:
+  ci_image_diff:
+    name: CI Image Diff
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Extract branch name
+      shell: bash
+      run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/})"
+      id: extract_branch
+    - uses: actions/setup-python@v2
+      with:
+        python-version: 3.7.7
+    - name: Install Python Dependencies
+      run: pip install -r requirements.txt
+    - name: Running playwright's install
+      run: playwright install
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+        aws-secret-access-key: ${{ secrets.AWS_ACCESS_SECRET }}
+        aws-region: us-west-2
+    - name: Establishing baseline
+      run: python compare.py --update https://stackoverflow.com/questions
+    - name: Diff testing
+      run: python compare.py -o https://stackoverflow.com/questions
+    - name: Upload diffs to AWS S3
+      if: always()
+      run: aws s3 sync ./results/ s3://ci-image-diff/${{ steps.extract_branch.outputs.branch }} --acl public-read --delete
+    - name: What is the diff viewer URL for this PR?
+      if: always()
+      run: echo "https://ci-image-diff.s3-us-west-2.amazonaws.com/${{ steps.extract_branch.outputs.branch }}/index.html?reference=main&compare=compare"

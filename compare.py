@@ -29,8 +29,12 @@ parser.add_argument('-l', '--list', help='Read list of URLs to test from a plain
 parser.add_argument('-o', '--match-origin', action='store_true', help='Try to detect relocated content.')
 parser.add_argument('-r', '--result-dir', default='results', help='Directory for comparison results. Defaults to results.')
 parser.add_argument('-u', '--update', action='store_true', help='Update the ground truth screenshots.')
-parser.add_argument('-w', '--width', type=int, default='1200', help='The browser width in pixels. Defaults to 1200.')
+parser.add_argument('-w', '--width', type=str, default='1200', help='The browser width in pixels. Defaults to 1200.')
 args = parser.parse_args()
+
+page_widths = args.width
+page_widths = page_widths.split(',') if ',' in page_widths else [page_widths]
+page_widths = [int(v) for v in page_widths]
 
 # Form the list of URLs we need to gather screenshots for
 url_stripper = re.compile(r"https?://(www\.)?")
@@ -50,28 +54,31 @@ def path_safe(str):
     return str.replace(':', '-').replace('@','-')
 
 
-async def capture_screenshot_for_url(p, browser, browser_type, url_path, page_url):
+async def capture_screenshot_for_url(p, browser, browser_type, page_widths, url_path, page_url):
     browser_name = browser_type.name
 
-    print(f'Navigating to {page_url} using {browser_name}, url_path:', url_path)
-    page = await browser.new_page()
-    await page.set_viewport_size({ 'width': args.width, 'height': 800 })
-    await page.goto(page_url)
+    print(page_widths)
 
-    # It would be lovely if Webkit actually, you know, worked like everything else...
-    wait_type = 'networkidle' if browser_type is not p.webkit else 'domcontentloaded'
-    await page.wait_for_load_state(wait_type)
+    for page_width in page_widths:
+        print(f'Navigating to {page_url} using {browser_name} as size {page_width} - url_path=', url_path)
+        page = await browser.new_page()
+        await page.set_viewport_size({ 'width': page_width, 'height': 800 })
+        await page.goto(page_url)
 
-    # Figure out which path we need to write to, and ensure the dir for that exists.
-    parent = f'./diffs/{screenshot_base_dir}/{browser_name}-{args.width}/{url_path}'
-    Path(parent).mkdir(parents=True, exist_ok=True)
-    image_path = f'{parent}/screenshot.png'
+        # It would be lovely if Webkit actually, you know, worked like everything else...
+        wait_type = 'networkidle' if browser_type is not p.webkit else 'domcontentloaded'
+        await page.wait_for_load_state(wait_type)
 
-    print(f'Creating {image_path}')
-    await page.screenshot(path=image_path, full_page=True)
+        # Figure out which path we need to write to, and ensure the dir for that exists.
+        parent = f'./diffs/{screenshot_base_dir}/{browser_name}-{page_width}/{url_path}'
+        Path(parent).mkdir(parents=True, exist_ok=True)
+        image_path = f'{parent}/screenshot.png'
+
+        print(f'Creating {image_path}')
+        await page.screenshot(path=image_path, full_page=True)
 
 
-async def capture_screenshots_for(p, browser_type, urls, url_paths):
+async def capture_screenshots_for(p, browser_type, page_widths, urls, url_paths):
     browser_name = browser_type.name
     browser = await browser_type.launch(headless=True)
 
@@ -83,6 +90,7 @@ async def capture_screenshots_for(p, browser_type, urls, url_paths):
                 p,
                 browser,
                 browser_type,
+                page_widths,
                 path_safe(url_paths[i]),
                 page_url,
             )
@@ -155,6 +163,7 @@ async def capture_screenshots(urls):
                     capture_screenshots_for(
                         p,
                         browser_type,
+                        page_widths,
                         urls,
                         url_paths
                     )
@@ -172,17 +181,18 @@ async def capture_screenshots(urls):
             failures = 0
 
             for browser_type in browsers:
-                key = f'{browser_type.name}-{args.width}'
-                report[key] = await compare_screenshots(
-                    args.base_dir,
-                    args.result_dir,
-                    args.ground_truth,
-                    args.compare,
-                    url_paths,
-                    browser_type.name,
-                    args.width
-                )
-                failures += len(report[key])
+                for page_width in page_widths:
+                    key = f'{browser_type.name}-{page_width}'
+                    report[key] = await compare_screenshots(
+                        args.base_dir,
+                        args.result_dir,
+                        args.ground_truth,
+                        args.compare,
+                        url_paths,
+                        browser_type.name,
+                        page_width
+                    )
+                    failures += len(report[key])
 
             # Save the diff report as a JSON file in the result dir for this compare branch
             result_file = open(f'./{args.result_dir}/{args.compare}/diffs.json', 'w')

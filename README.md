@@ -138,8 +138,11 @@ jobs:
       run: |
         git clone https://github.com/MozillaFoundation/ci-image-diff
         cd ci-image-diff
+        python -m venv venv
+        source venv/bin/activate
         pip install -r requirements.txt
         playwright install
+        source venv/bin/deactivate
         cd ..
     - name: Starting your build and server etc
       run: |
@@ -149,7 +152,8 @@ jobs:
     - name: Establish or update the baseline
       run: |
         cd ci-image-diff
-        python compare.py --update -l urls.txt
+        source venv/bin/activate
+        python compare.py --update -l ../testing/urls.txt
     - name: Upload baseline to AWS S3
       run: aws s3 sync ./diffs/main s3://${{ secrets.AWS_BUCKET_NAME_FOR_VISUAL_CI }}/baseline --acl public-read --delete
 ```
@@ -189,8 +193,11 @@ jobs:
       run: |
         git clone https://github.com/MozillaFoundation/ci-image-diff
         cd ci-image-diff
+        python -m venv venv
+        source venv/bin/activate
         pip install -r requirements.txt
         playwright install
+        source venv/bin/deactivate
         cd ..
     - name: Starting your build and server etc
       run: |
@@ -200,7 +207,10 @@ jobs:
     - name: Downloading visual diffing baseline
       run: aws s3 sync s3://ci-image-diff/baseline ./diffs/main
     - name: Testing for visual regressions
-      run: python compare.py -o https://stackoverflow.com/questions
+      run: |
+        cd ci-image-diff
+        source venv/bin/activate
+        python compare.py -o -l ../testing/urls.txt
     - name: Uploading diffs to AWS S3
       if: always()
       run: aws s3 sync ./results/ s3://YOUR-BUCKET-NAME-HERE/${{ steps.extract_branch.outputs.branch }} --acl public-read --delete

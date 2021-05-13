@@ -32,6 +32,7 @@ parser.add_argument('-u', '--update', action='store_true', help='Update the grou
 parser.add_argument('-w', '--width', type=str, default='1200', help='The browser width in pixels. Defaults to 1200.')
 args = parser.parse_args()
 
+# Make sure all width(s) are numbers
 page_widths = args.width
 page_widths = page_widths.split(',') if ',' in page_widths else [page_widths]
 page_widths = [int(v) for v in page_widths]

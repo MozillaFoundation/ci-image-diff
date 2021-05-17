@@ -10,6 +10,7 @@ import os
 import re
 import sys
 import json
+import time
 import argparse
 import asyncio
 
@@ -55,20 +56,45 @@ def path_safe(str):
     return str.replace(':', '-').replace('@','-')
 
 
+async def content_is_stable(page_inner_html, page_width, page):
+    """
+    Ideally we do this using screenshots, see https://github.com/MozillaFoundation/ci-image-diff/issues/21
+    """
+    attempt = 0
+
+    while attempt < 10:
+        attempt += 1
+
+        html = await page.query_selector("html")
+        inner_html = await html.inner_html()
+        previous_inner_html = page_inner_html.get(str(page_width), '')
+
+        if inner_html == previous_inner_html:
+            # Page has stabilised
+            return True
+
+        page_inner_html[str(page_width)] = inner_html
+        await asyncio.sleep(2)
+
+    # Page has *not* stabilised but we've run out of attempts.
+    return False
+
+
 async def capture_screenshot_for_url(p, browser, browser_type, page_widths, url_path, page_url):
     browser_name = browser_type.name
 
-    print(page_widths)
+    page_inner_html = {}
 
     for page_width in page_widths:
-        print(f'Navigating to {page_url} using {browser_name} as size {page_width} - url_path=', url_path)
+        print(f'Navigating to {page_url} using {browser_name} at size {page_width}, url:', url_path)
         page = await browser.new_page()
+
+        # Size the viewport and navigate to the URL we want to capture.
         await page.set_viewport_size({ 'width': page_width, 'height': 800 })
         await page.goto(page_url)
 
-        # It would be lovely if Webkit actually, you know, worked like everything else...
-        wait_type = 'networkidle' if browser_type is not p.webkit else 'domcontentloaded'
-        await page.wait_for_load_state(wait_type)
+        # Rather than relying on 'networkidle' or 'domcontentready', we wait for the page DOM to stabilize.
+        await content_is_stable(page_inner_html, page_width, page)
 
         # Figure out which path we need to write to, and ensure the dir for that exists.
         parent = f'./diffs/{screenshot_base_dir}/{browser_name}-{page_width}/{url_path}'
@@ -173,7 +199,7 @@ async def capture_screenshots(urls):
 
             print('Starting captures')
             await asyncio.gather(*tasks, return_exceptions=True)
-            print('Finished captures:')
+            print('Finished captures.')
 
         # TODO: we can almost certainly parallelise all diffing tasks
         if not args.update:

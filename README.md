@@ -122,40 +122,50 @@ jobs:
     name: CI Image Diff
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_FOR_VISUAL_CI }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_FOR_VISUAL_CI }}
         aws-region: your-aws-s3-region-indicator
+
+    - uses: actions/checkout@v2
+
     - uses: actions/setup-python@v2
       with:
         python-version: 3.7 or higher
+
     - name: Installing git
       run: sudo apt-get install git
+
     - name: Fetching ci-image-diff
+      run: git clone https://github.com/MozillaFoundation/ci-image-diff
+
+    - name: Installing ci-image-diff dependencies
       run: |
-        git clone https://github.com/MozillaFoundation/ci-image-diff
         cd ci-image-diff
         python -m venv venv
         source venv/bin/activate
         pip install -r requirements.txt
         playwright install
-        source venv/bin/deactivate
-        cd ..
+
     - name: Starting your build and server etc
       run: |
         ...
         ...
         ...
+
     - name: Establish or update the baseline
       run: |
         cd ci-image-diff
         source venv/bin/activate
         python compare.py --update -l ../testing/urls.txt
+
     - name: Upload baseline to AWS S3
-      run: aws s3 sync ./diffs/main s3://${{ secrets.AWS_BUCKET_NAME_FOR_VISUAL_CI }}/baseline --acl public-read --delete
+      run: |
+        cd ci-image-diff
+        aws s3 sync ./diffs/main s3://${{ secrets.AWS_BUCKET_NAME_FOR_VISUAL_CI }}/baseline --acl public-read --delete
 ```
 
 ### (2) Performing visual diffing against your baseline for incoming PRs
@@ -174,49 +184,68 @@ jobs:
     name: CI Image Diff
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+
+    - name: Extract branch name for upload step
+      shell: bash
+      run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/})"
+      id: extract_branch
+
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_FOR_VISUAL_CI }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_FOR_VISUAL_CI }}
-    - name: Extract branch name
-      shell: bash
-      run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/})"
-      id: extract_branch
+
+    - uses: actions/checkout@v2
+
     - uses: actions/setup-python@v2
       with:
         python-version: 3.7 or higher
+
     - name: Installing git
       run: sudo apt-get install git
+
     - name: Fetching ci-image-diff
+      run: git clone https://github.com/MozillaFoundation/ci-image-diff
+
+    - name: Installing ci-image-diff dependencies
       run: |
-        git clone https://github.com/MozillaFoundation/ci-image-diff
         cd ci-image-diff
         python -m venv venv
         source venv/bin/activate
         pip install -r requirements.txt
         playwright install
-        source venv/bin/deactivate
-        cd ..
+
     - name: Starting your build and server etc
       run: |
         ...
         ...
         ...
-    - name: Downloading visual diffing baseline
-      run: aws s3 sync s3://ci-image-diff/baseline ./diffs/main
+
+    - name: Downloading the visual diffing baseline
+      run: aws s3 sync s3://your.bucket.name/baseline ./diffs/main
+
     - name: Testing for visual regressions
       run: |
         cd ci-image-diff
         source venv/bin/activate
         python compare.py -o -l ../testing/urls.txt
+
     - name: Uploading diffs to AWS S3
-      if: always()
-      run: aws s3 sync ./results/ s3://YOUR-BUCKET-NAME-HERE/${{ steps.extract_branch.outputs.branch }} --acl public-read --delete
-    - name: What is the diff viewer URL for this PR?
-      if: always()
-      run: echo "https://YOUR-BUCKET-NAME-HERE.s3-your-aws-s3-region-indicator.amazonaws.com/${{ steps.extract_branch.outputs.branch }}/index.html?reference=main&compare=compare"
+      if: ${{ failure() }}
+      run: aws s3 sync ./results/ s3://your.bucket.name/${{ steps.extract_branch.outputs.branch }} --acl public-read --delete
+
+    - uses: actions/github-script@v3
+      if: ${{ failure() }}
+      with:
+        github-token: ${{secrets.GITHUB_TOKEN}}
+        script: |
+          github.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: 'This PR introduces visual differences. Click [here](https://your.bucket.name.s3-your-aws-region.amazonaws.com/${{ steps.extract_branch.outputs.branch }}/index.html?reference=main&compare=compare) to inspect the diffs.'
+          })
 ```
 
 This will download the baseline we established earlier, and compare it to this PR's codebase results, then upload it to S3 so that any diffs can be inspected on the URL that the "what is the diff viewer URL" task echos.

@@ -29,6 +29,7 @@ parser.add_argument('-g', '--ground-truth', default='main', help='Set the ground
 parser.add_argument('-l', '--list', help='Read list of URLs to test from a plain text, newline delimited file.')
 parser.add_argument('-o', '--match-origin', action='store_true', help='Try to detect relocated content when analysing diffs.')
 parser.add_argument('-p', '--log-path-only', action='store_true', help='Only log which path is being compared, rather than image locations.')
+parser.add_argument('-q', '--queue-size', type=int, default=5, help='Sets the maximum number of concurrent network requests. Defaults to 5')
 parser.add_argument('-r', '--result-dir', default='results', help='Directory for comparison results. Defaults to results.')
 parser.add_argument('-u', '--update', action='store_true', help='Update the ground truth screenshots.')
 parser.add_argument('-v', '--verbose', action='store_true', help="Log progress to stdout.")
@@ -55,6 +56,9 @@ else:
 # Which directory are we writing files to?
 screenshot_base_dir = args.ground_truth if args.update else args.compare
 
+# master list of open browsers, for closing once done
+browsers = list()
+
 if args.verbose_exclusive:
     args.verbose = True
 
@@ -69,78 +73,84 @@ def path_safe(str):
     return str.replace(':', '-').replace('@','-')
 
 
-async def content_is_stable(page_inner_html, page_width, page):
+async def content_is_stable(page):
     """
     Ideally we do this using screenshots, see https://github.com/MozillaFoundation/ci-image-diff/issues/21
     """
     attempt = 0
+    previous_html = ''
 
     while attempt < 10:
         attempt += 1
 
         html = await page.query_selector("html")
         inner_html = await html.inner_html()
-        previous_inner_html = page_inner_html.get(str(page_width), '')
 
-        if inner_html == previous_inner_html:
+        if inner_html == previous_html:
             # Page has stabilised
             return True
 
-        page_inner_html[str(page_width)] = inner_html
+        previous_html = inner_html
         await asyncio.sleep(2)
 
     # Page has *not* stabilised but we've run out of attempts.
     return False
 
 
-async def capture_screenshot_for_url(p, browser, browser_type, page_widths, url_path, page_url):
+async def capture_screenshot_for_url_at_width(request_queue, p, browser, browser_type, page_widths, url_path, page_url, width):
     browser_name = browser_type.name
 
-    page_inner_html = {}
+    log_info(f'Navigating to {page_url} using {browser_name} at size {page_width}, url:', url_path)
+    page = await browser.new_page()
 
-    for page_width in page_widths:
-        log_info(f'Navigating to {page_url} using {browser_name} at size {page_width}, url:', url_path)
-        page = await browser.new_page()
+    # Size the viewport and navigate to the URL we want to capture.
+    await page.set_viewport_size({ 'width': page_width, 'height': 800 })
+    await page.goto(page_url)
 
-        # Size the viewport and navigate to the URL we want to capture.
-        await page.set_viewport_size({ 'width': page_width, 'height': 800 })
-        await page.goto(page_url)
+    # Rather than relying on 'networkidle' or 'domcontentready', we wait for the page DOM to stabilize.
+    await content_is_stable(page)
 
-        # Rather than relying on 'networkidle' or 'domcontentready', we wait for the page DOM to stabilize.
-        await content_is_stable(page_inner_html, page_width, page)
+    # Figure out which path we need to write to, and ensure the dir for that exists.
+    parent = f'./diffs/{screenshot_base_dir}/{browser_name}-{page_width}/{url_path}'
+    Path(parent).mkdir(parents=True, exist_ok=True)
+    image_path = f'{parent}/screenshot.png'
 
-        # Figure out which path we need to write to, and ensure the dir for that exists.
-        parent = f'./diffs/{screenshot_base_dir}/{browser_name}-{page_width}/{url_path}'
-        Path(parent).mkdir(parents=True, exist_ok=True)
-        image_path = f'{parent}/screenshot.png'
-
-        log_info(f'Creating {image_path}')
-        await page.screenshot(path=image_path, full_page=True)
+    log_info(f'Creating {image_path}')
+    await page.screenshot(path=image_path, full_page=True)
 
 
-async def capture_screenshots_for(p, browser_type, page_widths, urls, url_paths):
+
+async def capture_screenshot_for_url(request_queue, p, browser, browser_type, page_widths, url_path, page_url):
+    return [
+        asyncio.create_task(
+            capture_screenshot_for_url_at_width(request_queue, p, browser, browser_type, page_widths, url_path, page_url, page_width)
+        )
+        for page_width in page_widths
+    ]
+
+
+async def capture_screenshots_for(request_queue, p, browser_type, page_widths, urls, url_paths):
     browser_name = browser_type.name
     browser = await browser_type.launch(headless=True)
 
-    log_info(f'Initialising captures for {browser_name}')
-    screenshot_tasks = []
-    for (i, page_url) in enumerate(url_list):
-        task = asyncio.create_task(
-            capture_screenshot_for_url(
-                p,
-                browser,
-                browser_type,
-                page_widths,
-                path_safe(url_paths[i]),
-                page_url,
-            )
-        )
-        screenshot_tasks.append(task)
+    browsers.append(browser)
 
-    log_info(f'Starting {len(screenshot_tasks)} captures')
-    await asyncio.gather(*screenshot_tasks, return_exceptions=True)
-    await browser.close()
-    log_info(f'Fininshed capturing for {browser_name}')
+    log_info(f'Initialising captures for {browser_name}')
+    tasklist = list()
+    for (i, page_url) in enumerate(url_list):
+        tasks = await capture_screenshot_for_url(
+            request_queue,
+            p,
+            browser,
+            browser_type,
+            page_widths,
+            path_safe(url_paths[i]),
+            page_url,
+        )
+        tasklist.add_all(tasks)
+
+    log_info(f'Scheduled {len(screenshot_tasks)} captures for {browser_name}')
+    return tasklist
 
 
 async def call_diff_script(base_dir, result_dir, ground_truth_dir, compare_dir, url_path, browser_name, width, failures):
@@ -217,15 +227,17 @@ async def capture_screenshots(urls):
     """
 
     async with async_playwright() as p:
+        request_queue = asyncio.Queue(args.queue_size)
         browsers = [p.chromium, p.firefox]  # we don't include p.webkit because it's just too fickle
         url_paths = [url_stripper.sub('', u.strip()).strip('/') for u in url_list]
 
         if not args.compare_only:
-            tasks = []
+            tasklist = []
 
             for browser_type in browsers:
-                task = asyncio.create_task(
+                tasks = asyncio.create_task(
                     capture_screenshots_for(
+                        request_queue,
                         p,
                         browser_type,
                         page_widths,
@@ -233,10 +245,11 @@ async def capture_screenshots(urls):
                         url_paths
                     )
                 )
-                tasks.append(task)
+                tasklist.append_all(tasks)
 
             log_info('Starting captures')
             await asyncio.gather(*tasks, return_exceptions=True)
+            await request_queue.join()
             log_info('Finished captures.')
 
         # TODO: we can almost certainly parallelise all diffing tasks

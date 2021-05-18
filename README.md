@@ -165,7 +165,7 @@ jobs:
     - name: Upload baseline to AWS S3
       run: |
         cd ci-image-diff
-        aws s3 sync ./diffs/main s3://${{ secrets.AWS_BUCKET_NAME_FOR_VISUAL_CI }}/baseline --acl public-read --delete
+        aws s3 sync ./diffs/main s3://your-bucket-name/baseline --acl public-read --delete
 ```
 
 ### (2) Performing visual diffing against your baseline for incoming PRs
@@ -223,7 +223,7 @@ jobs:
         ...
 
     - name: Downloading the visual diffing baseline
-      run: aws s3 sync s3://your.bucket.name/baseline ./diffs/main
+      run: aws s3 sync s3://your-bucket-name/baseline ./diffs/main
 
     - name: Testing for visual regressions
       run: |
@@ -233,7 +233,7 @@ jobs:
 
     - name: Uploading diffs to AWS S3
       if: ${{ failure() }}
-      run: aws s3 sync ./results/ s3://your.bucket.name/${{ steps.extract_branch.outputs.branch }} --acl public-read --delete
+      run: aws s3 sync ./results/ s3://your-bucket-name/${{ steps.extract_branch.outputs.branch }} --acl public-read --delete
 
     - uses: actions/github-script@v3
       if: ${{ failure() }}
@@ -244,7 +244,7 @@ jobs:
             issue_number: context.issue.number,
             owner: context.repo.owner,
             repo: context.repo.repo,
-            body: 'This PR introduces visual differences. Click [here](https://your.bucket.name.s3-your-aws-region.amazonaws.com/${{ steps.extract_branch.outputs.branch }}/index.html?reference=main&compare=compare) to inspect the diffs.'
+            body: 'This PR introduces visual differences. Click [here](https://your-bucket-name.s3.your-aws-region.amazonaws.com/${{ steps.extract_branch.outputs.branch }}/index.html?reference=main&compare=compare) to inspect the diffs.'
           })
 ```
 

@@ -135,6 +135,11 @@ async def call_diff_script(base_dir, result_dir, ground_truth_dir, compare_dir, 
 
     image_path = f'{browser_name}-{width}/{url_path}/screenshot.png'
     ground_truth = f'./{base_dir}/{ground_truth_dir}/{image_path}'
+
+    if os.path.exists(ground_truth) is False:
+        print(f'Cannot find {ground_truth} - skipping compare for {browser_name} at {width}px')
+        return
+
     compare = f'./{base_dir}/{compare_dir}/{image_path}'
 
     result_path = f'./{result_dir}/{compare_dir}/{browser_name}-{width}/{url_path}'

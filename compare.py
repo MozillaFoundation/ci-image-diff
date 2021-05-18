@@ -19,18 +19,22 @@ from shutil import copyfile
 from distutils.dir_util import copy_tree
 from playwright.async_api import async_playwright
 
-
 parser = argparse.ArgumentParser(description='Take a screenshot of a web page.')
 parser.add_argument('url', nargs='?', help='The URL for the web page.')
 parser.add_argument('-b', '--base-dir', default='diffs', help='Directory for diffs. Defaults to diffs.')
 parser.add_argument('-c', '--compare', default='compare', help='Save screenshots to the indicated dir. Defaults to compare.')
 parser.add_argument('-co', '--compare-only', action='store_true', help='Do not (re)fetch screenshots.')
+parser.add_argument('-m', '--missing-error', action='store_true', help='Treat missing ground truth screenshot as error.')
 parser.add_argument('-g', '--ground-truth', default='main', help='Set the ground truth dir. Defaults to main.')
 parser.add_argument('-l', '--list', help='Read list of URLs to test from a plain text, newline delimited file.')
-parser.add_argument('-o', '--match-origin', action='store_true', help='Try to detect relocated content.')
+parser.add_argument('-o', '--match-origin', action='store_true', help='Try to detect relocated content when analysing diffs.')
+parser.add_argument('-p', '--log-path-only', action='store_true', help='Only log which path is being compared, rather than image locations.')
 parser.add_argument('-r', '--result-dir', default='results', help='Directory for comparison results. Defaults to results.')
 parser.add_argument('-u', '--update', action='store_true', help='Update the ground truth screenshots.')
+parser.add_argument('-v', '--verbose', action='store_true', help="Log progress to stdout.")
+parser.add_argument('-vx', '--verbose-exclusive', action='store_true', help="Log progress, but skip logging of each diff process.")
 parser.add_argument('-w', '--width', type=str, default='1200', help='The browser width in pixels. Defaults to 1200.')
+parser.add_argument('-z', '--server-hint', action='store_true', help="Print the diff viewer instructions at the end of the run.")
 args = parser.parse_args()
 
 # Make sure all width(s) are numbers
@@ -51,6 +55,15 @@ else:
 # Which directory are we writing files to?
 screenshot_base_dir = args.ground_truth if args.update else args.compare
 
+if args.verbose_exclusive:
+    args.verbose = True
+
+LOG_VERBOSE = args.verbose
+
+def log_info(*args):
+	if LOG_VERBOSE is False:
+		return
+	print(*args)
 
 def path_safe(str):
     return str.replace(':', '-').replace('@','-')
@@ -86,7 +99,7 @@ async def capture_screenshot_for_url(p, browser, browser_type, page_widths, url_
     page_inner_html = {}
 
     for page_width in page_widths:
-        print(f'Navigating to {page_url} using {browser_name} at size {page_width}, url:', url_path)
+        log_info(f'Navigating to {page_url} using {browser_name} at size {page_width}, url:', url_path)
         page = await browser.new_page()
 
         # Size the viewport and navigate to the URL we want to capture.
@@ -101,7 +114,7 @@ async def capture_screenshot_for_url(p, browser, browser_type, page_widths, url_
         Path(parent).mkdir(parents=True, exist_ok=True)
         image_path = f'{parent}/screenshot.png'
 
-        print(f'Creating {image_path}')
+        log_info(f'Creating {image_path}')
         await page.screenshot(path=image_path, full_page=True)
 
 
@@ -109,7 +122,7 @@ async def capture_screenshots_for(p, browser_type, page_widths, urls, url_paths)
     browser_name = browser_type.name
     browser = await browser_type.launch(headless=True)
 
-    print(f'Initialising captures for {browser_name}')
+    log_info(f'Initialising captures for {browser_name}')
     screenshot_tasks = []
     for (i, page_url) in enumerate(url_list):
         task = asyncio.create_task(
@@ -124,10 +137,10 @@ async def capture_screenshots_for(p, browser_type, page_widths, urls, url_paths)
         )
         screenshot_tasks.append(task)
 
-    print(f'Starting {len(screenshot_tasks)} captures')
+    log_info(f'Starting {len(screenshot_tasks)} captures')
     await asyncio.gather(*screenshot_tasks, return_exceptions=True)
     await browser.close()
-    print(f'Fininshed capturing for {browser_name}')
+    log_info(f'Fininshed capturing for {browser_name}')
 
 
 async def call_diff_script(base_dir, result_dir, ground_truth_dir, compare_dir, url_path, browser_name, width, failures):
@@ -137,7 +150,11 @@ async def call_diff_script(base_dir, result_dir, ground_truth_dir, compare_dir, 
     ground_truth = f'./{base_dir}/{ground_truth_dir}/{image_path}'
 
     if os.path.exists(ground_truth) is False:
-        print(f'Cannot find {ground_truth} - skipping compare for {browser_name} at {width}px')
+        log_info(f'Cannot find {ground_truth} - skipping compare for {browser_name} at {width}px')
+
+        if args.missing_error is True:
+            failures.append(url_path)
+
         return
 
     compare = f'./{base_dir}/{compare_dir}/{image_path}'
@@ -146,11 +163,28 @@ async def call_diff_script(base_dir, result_dir, ground_truth_dir, compare_dir, 
     Path(result_path).mkdir(parents=True, exist_ok=True)
     cmd = f'{sys.executable} diff.py -w -r {result_path} {ground_truth} {compare}'
 
+    # are we comparing with relocation detection?
     if args.match_origin:
         cmd = f'{cmd} -o'
 
-    print(f'\ncalling {cmd}')
+    # what level of logging do we need for the diff.py call?
+    if args.verbose == False or args.verbose_exclusive == True:
+        if args.log_path_only is True:
+            # no logging except for the diff pass/fail result
+            cmd = f'{cmd} -t'
+        else:
+            # no logging at all
+            cmd = f'{cmd} -s'
+
+
+
+    if args.log_path_only is True:
+        log_info(f'\ncomparing screenshots for {url_path} as taken by {browser_name} at {width}px...')
+    else:
+        log_info(f'\ncalling {cmd}')
+
     return_code = os.system(cmd)
+
     if return_code != 0:
         copyfile(compare, compare.replace(f'{base_dir}/', f'{result_dir}/'))
         failures.append(url_path)
@@ -161,7 +195,6 @@ async def compare_screenshots(base_dir, result_dir, ground_truth_dir, compare_di
 
     copy_tree(f'./{base_dir}/{ground_truth_dir}', f'./{result_dir}/{ground_truth_dir}')
 
-    print('Running diff scripts')
     for url_path in url_paths:
         await call_diff_script(
             base_dir,
@@ -202,13 +235,13 @@ async def capture_screenshots(urls):
                 )
                 tasks.append(task)
 
-            print('Starting captures')
+            log_info('Starting captures')
             await asyncio.gather(*tasks, return_exceptions=True)
-            print('Finished captures.')
+            log_info('Finished captures.')
 
         # TODO: we can almost certainly parallelise all diffing tasks
         if not args.update:
-            print("comparing screenshots")
+            log_info("comparing screenshots")
             report = {}
             failures = 0
 
@@ -231,10 +264,10 @@ async def capture_screenshots(urls):
             result_file.write(json.dumps(report, indent=2))
             result_file.close()
 
-            if failures > 0:
-                print(f'\nVisual diffs found in {failures} screenshots')
-                print(f'run:\n    python -m http.server --directory {args.result_dir} 8080')
-                print(f'then open:\n    http://localhost:8080/?reference={args.ground_truth}&compare={args.compare}')
+            if failures > 0 and args.server_hint:
+                log_info(f'\nVisual diffs found in {failures} screenshots')
+                log_info(f'run:\n    python -m http.server --directory {args.result_dir} 8080')
+                log_info(f'then open:\n    http://localhost:8080/?reference={args.ground_truth}&compare={args.compare}')
                 sys.exit(failures)
 
 

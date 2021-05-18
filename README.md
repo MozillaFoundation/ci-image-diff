@@ -36,8 +36,9 @@ Then to install the dependencies:
 Use `compare.py`. Its help documentation is listed here for convenience, but documentation may go out of date: run `python compare.py -h` for its most up to date documentation.
 
 ```
-usage: compare.py [-h] [-b BASE_DIR] [-c COMPARE] [-co] [-g GROUND_TRUTH]
-                  [-l LIST] [-o] [-r RESULT_DIR] [-u] [-w WIDTH]
+usage: compare.py [-h] [-b BASE_DIR] [-c COMPARE] [-co] [-m] [-g GROUND_TRUTH]
+                  [-l LIST] [-o] [-p] [-r RESULT_DIR] [-u] [-v] [-vx]
+                  [-w WIDTH] [-z]
                   [url]
 
 Take a screenshot of a web page.
@@ -53,16 +54,24 @@ optional arguments:
                         Save screenshots to the indicated dir. Defaults to
                         compare.
   -co, --compare-only   Do not (re)fetch screenshots.
+  -m, --missing-error   Treat missing ground truth screenshot as error.
   -g GROUND_TRUTH, --ground-truth GROUND_TRUTH
                         Set the ground truth dir. Defaults to main.
   -l LIST, --list LIST  Read list of URLs to test from a plain text, newline
                         delimited file.
-  -o, --match-origin    Try to detect relocated content.
+  -o, --match-origin    Try to detect relocated content when analysing diffs.
+  -p, --log-path-only   Only log which path is being compared, rather than
+                        image locations.
   -r RESULT_DIR, --result-dir RESULT_DIR
                         Directory for comparison results. Defaults to results.
   -u, --update          Update the ground truth screenshots.
+  -v, --verbose         Log progress to stdout.
+  -vx, --verbose-exclusive
+                        Log progress, but skip logging of each diff process.
   -w WIDTH, --width WIDTH
                         The browser width in pixels. Defaults to 1200.
+  -z, --server-hint     Print the diff viewer instructions at the end of the
+                        run.
 ```
 
 
@@ -71,7 +80,8 @@ optional arguments:
 Use `diff.py`. Its help documentation is listed here for convenience, but documentation may go out of date: run `python diff.py -h` for its most up to date documentation.
 
 ```
-usage: diff.py [-h] [-o] [-p MAX_PASSES] [-r RESULT_PATH] [-w] original new
+usage: diff.py [-h] [-o] [-p MAX_PASSES] [-r RESULT_PATH] [-s] [-t] [-w]
+               original new
 
 Diff two (bitmap) images.
 
@@ -81,12 +91,16 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  -o, --match-origin    try to detect relocated content.
+  -o, --match-origin    Try to detect relocated content.
   -p MAX_PASSES, --max-passes MAX_PASSES
-                        the maximum number of diff-merge passes.
+                        The maximum number of diff-merge passes. defaults to
+                        5.
   -r RESULT_PATH, --result-path RESULT_PATH
-                        the maximum number of diff-merge passes.
-  -w, --write           write the highlighted images to disk.
+                        The dir to write the comparison results to. defaults
+                        to results.
+  -s, --silent          Do not log progress to stdout.
+  -t, --terse-logging   Only log diff pass/fail result.
+  -w, --write           Write the highlighted images to disk.
 ```
 
 Note that under no circumstances do you want to use JPG images here, because JPG block compression _will_ show up as diff, so you end up with a page that, to humans, looks the same, and to the computer looks literally 100% different. Not super useful.
@@ -160,7 +174,7 @@ jobs:
       run: |
         cd ci-image-diff
         source venv/bin/activate
-        python compare.py --update -l ../testing/urls.txt
+        python compare.py --update --list ../testing/urls.txt
 
     - name: Upload baseline to AWS S3
       run: |
@@ -229,7 +243,7 @@ jobs:
       run: |
         cd ci-image-diff
         source venv/bin/activate
-        python compare.py -o -l ../testing/urls.txt
+        python compare.py --match-origin --list ../testing/urls.txt --verbose-exclusive --log-path-only
 
     - name: Uploading diffs to AWS S3
       if: ${{ failure() }}

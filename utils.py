@@ -11,11 +11,20 @@ import numpy as np
 import imutils
 from skimage.metrics import structural_similarity
 
+
 BLACK = (0,0,0)
 WHITE = (255,255,255)
 RED = (0,0,255)
 GREEN = (0,255,0)
 BLUE = (255,0,0)
+
+SUPPRESS_LOGGING = False
+
+def log_info(*args):
+	if SUPPRESS_LOGGING is True:
+		return
+	print(*args)
+
 
 def loadImage(path):
 	"""
@@ -171,7 +180,7 @@ def highlight_diffs(a, b, diffs, write=False, result_path='results', match_origi
 	diff_mask[:] = (255, 255, 255)
 
 	for num, area in enumerate(diffs):
-		print(f'processing diff {num+1} (bbox={area})')
+		log_info(f'processing diff {num+1} (bbox={area})')
 		x1, y1, x2, y2 = area
 		origin = None
 
@@ -200,7 +209,7 @@ def highlight_diffs(a, b, diffs, write=False, result_path='results', match_origi
 			# Same case as when match_origin can't find matches:
 			cv2.rectangle(diff_mask, (x1, y1), (x2, y2), GREEN, cv2.FILLED)
 
-	print('diff pass complete')
+	log_info('diff pass complete')
 
 	if (write):
 		cv2.imwrite(f'{result_path}/original_mask.png', original_mask)
@@ -219,27 +228,32 @@ def hue(img):
 	return cv2.cvtColor(img, cv2.COLOR_BGR2HSV)[:,:,0]
 
 
-def perform_diffing(image_pair, write=False, result_path='results', match_origin=True, max_passes=5):
+def perform_diffing(image_pair, write=False, result_path='results', match_origin=True, max_passes=5, terse=False, silent=False):
+
+	if silent is True:
+		global SUPPRESS_LOGGING
+		SUPPRESS_LOGGING = True
+
 	(a, b) = image_pair
 
-	print('Running grayscale comparison...')
+	log_info('Running grayscale comparison...')
 	grayDiff = compare("gray", gray(a), gray(b))
 
-	print('Running hue comparison...')
+	log_info('Running hue comparison...')
 	hueDiff = compare("hue", hue(a), hue(b))
 
 	diff = cv2.addWeighted(grayDiff, 0.5, hueDiff, 0.5, 0)
 
-	print('Contrast-boosting diff...')
+	log_info('Contrast-boosting diff...')
 	diff = cv2.cvtColor(diff, cv2.COLOR_GRAY2BGR)
 	diff[np.where((diff<[254,254,254]).all(axis=2))] = [0,0,0]
 	diff = cv2.cvtColor(diff, cv2.COLOR_BGR2GRAY)
 
-	print('Extracting contours...')
+	log_info('Extracting contours...')
 	diffs, tinydiffs = extract_contours(diff)
 	diffs.extend(tinydiffs)
 	diff_count = len(diffs)
-	print(f'found {diff_count} differences.')
+	log_info(f'found {diff_count} differences.')
 
 	if diff_count > 0:
 		passes = 0
@@ -249,20 +263,27 @@ def perform_diffing(image_pair, write=False, result_path='results', match_origin
 			# given the number we're already dealing with, that's almost
 			# certainly fine...
 			passes += 1
-			print(f'too many diffs, attempting to collapse (pass {passes})...')
+			log_info(f'too many diffs, attempting to collapse (pass {passes})...')
 			prev_count = diff_count
 			diffs = collapse_diffs(a, diffs)
 			diff_count = len(diffs)
 			if diff_count == prev_count:
 				break
-		print(f'reduced to {len(diffs)} diffs')
+		log_info(f'reduced to {len(diffs)} diffs')
 
-		print('Starting diff highlight...')
+		log_info('Starting diff highlight...')
 		highlight_diffs(a, b, diffs, write, result_path, match_origin)
+
+		if terse is True:
+			print(f'- differences found.')
+
 		return diffs
 
 	else:
-		print('no differences detected')
+		if terse is True:
+			print('- no differences found.')
+		else:
+			log_info('no differences found.')
 
 
 def make_same_size(a, b):

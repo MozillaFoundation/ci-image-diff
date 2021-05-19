@@ -120,6 +120,7 @@ async def capture_screenshot_for_url_at_width(p, browser, browser_type, url_path
 
     log_info(f'Creating {image_path}')
     await page.screenshot(path=image_path, full_page=True)
+    await page.close()
 
 
 async def capture_screenshot_for_url(p, browser, browser_type, page_widths, url_path, page_url):

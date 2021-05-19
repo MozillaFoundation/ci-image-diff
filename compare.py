@@ -103,29 +103,26 @@ async def content_is_stable(page):
 
 
 async def capture_screenshot_for_url_at_width(p, browser, browser_type, url_path, page_url, page_width):
-    try:
-        browser_name = browser_type.name
+    browser_name = browser_type.name
 
-        async with semaphore:
-            # Create a new viewport, size it to the correct width, and navigate to the URL we want to capture.
-            page = await browser.new_page()
-            await page.set_viewport_size({ 'width': page_width, 'height': 800 })
+    async with semaphore:
+        # Create a new viewport, size it to the correct width, and navigate to the URL we want to capture.
+        page = await browser.new_page()
+        await page.set_viewport_size({ 'width': page_width, 'height': 800 })
 
-            log_info(f'Navigating to {page_url} using {browser_name} at size {page_width}, url:', url_path)
-            await page.goto(page_url)
+        log_info(f'Navigating to {page_url} using {browser_name} at size {page_width}, url:', url_path)
+        await page.goto(page_url)
 
-            # Rather than relying on 'networkidle' or 'domcontentready', we wait for the page DOM to stabilize.
-            await content_is_stable(page)
+        # Rather than relying on 'networkidle' or 'domcontentready', we wait for the page DOM to stabilize.
+        await content_is_stable(page)
 
-            # Figure out which path we need to write to, and ensure the dir for that exists.
-            parent = f'./diffs/{screenshot_base_dir}/{browser_name}-{page_width}/{url_path}'
-            Path(parent).mkdir(parents=True, exist_ok=True)
-            image_path = f'{parent}/screenshot.png'
+        # Figure out which path we need to write to, and ensure the dir for that exists.
+        parent = f'./diffs/{screenshot_base_dir}/{browser_name}-{page_width}/{url_path}'
+        Path(parent).mkdir(parents=True, exist_ok=True)
+        image_path = f'{parent}/screenshot.png'
 
-            log_info(f'Creating {image_path}')
-            await page.screenshot(path=image_path, full_page=True)
-    except Exception as e:
-        print(e)
+        log_info(f'Creating {image_path}')
+        await page.screenshot(path=image_path, full_page=True)
 
 
 async def capture_screenshot_for_url(p, browser, browser_type, page_widths, url_path, page_url):
@@ -304,4 +301,4 @@ async def capture_screenshots(urls):
 if len(url_list) == 0:
     parser.print_help()
 else:
-    asyncio.run(capture_screenshots(url_list), debug=True)
+    asyncio.run(capture_screenshots(url_list))

@@ -241,6 +241,8 @@ async def process_tasks(tasks, batch_size):
         ]
         tasks = tasks[batch_size:]
         await asyncio.gather(*work_queue)
+        # let's see if this improves logging responsiveness in github actions
+        asyncio.sleep(3000 / 1000)
 
 
 async def capture_screenshots(urls):

@@ -125,8 +125,8 @@ async def capture_screenshot_for_url_at_width(p, browser, browser_type, url_path
 
 async def capture_screenshot_for_url(p, browser, browser_type, page_widths, url_path, page_url):
     tasklist = []
-    for page_width in page_widths:
-        tasklist.append(lambda:
+    for width in page_widths:
+        tasklist.append(lambda page_width=width:
             capture_screenshot_for_url_at_width(
                 p,
                 browser,
@@ -242,8 +242,6 @@ async def process_tasks(tasks, batch_size):
         ]
         tasks = tasks[batch_size:]
         await asyncio.gather(*work_queue)
-        # let's see if this improves logging responsiveness in github actions
-        asyncio.sleep(3000 / 1000)
 
 
 async def capture_screenshots(urls):

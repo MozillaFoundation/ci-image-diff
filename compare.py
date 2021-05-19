@@ -100,7 +100,7 @@ async def content_is_stable(page):
     return False
 
 
-async def capture_screenshot_for_url_at_width(p, browser, browser_type, url_path, page_url, page_width):
+async def capture_screenshot_for_url_at_width(browser, browser_type, url_path, page_url, page_width):
     browser_name = browser_type.name
 
     # Create a new viewport, size it to the correct width, and navigate to the URL we want to capture.
@@ -123,12 +123,11 @@ async def capture_screenshot_for_url_at_width(p, browser, browser_type, url_path
     await page.close()
 
 
-async def capture_screenshot_for_url(p, browser, browser_type, page_widths, url_path, page_url):
+async def capture_screenshot_for_url(browser, browser_type, page_widths, url_path, page_url):
     tasklist = []
     for width in page_widths:
         tasklist.append(lambda page_width=width:
             capture_screenshot_for_url_at_width(
-                p,
                 browser,
                 browser_type,
                 url_path,
@@ -139,7 +138,7 @@ async def capture_screenshot_for_url(p, browser, browser_type, page_widths, url_
     return tasklist
 
 
-async def capture_screenshots_for(p, browser_type, page_widths, urls, url_paths):
+async def capture_screenshots_for(browser_type, page_widths, urls, url_paths):
     browser_name = browser_type.name
     browser = await browser_type.launch(headless=True)
     open_browsers.append(browser)
@@ -149,7 +148,6 @@ async def capture_screenshots_for(p, browser_type, page_widths, urls, url_paths)
     tasklist = []
     for (i, page_url) in enumerate(url_list):
         tasks = await capture_screenshot_for_url(
-            p,
             browser,
             browser_type,
             page_widths,
@@ -261,7 +259,6 @@ async def capture_screenshots(urls):
             log_info('Setting up capture list')
             for browser_type in browsers:
                 tasks = await capture_screenshots_for(
-                    p,
                     browser_type,
                     page_widths,
                     urls,

@@ -298,10 +298,11 @@ async def capture_screenshots(urls):
             result_file.write(json.dumps(report, indent=2))
             result_file.close()
 
-            if failures > 0 and args.server_hint:
-                log_info(f'\nVisual diffs found in {failures} screenshots')
-                log_info(f'run:\n    python -m http.server --directory {args.result_dir} 8080')
-                log_info(f'then open:\n    http://localhost:8080/?reference={args.ground_truth}&compare={args.compare}')
+            if failures > 0:
+                if args.server_hint is True:
+                    log_info(f'\nVisual diffs found in {failures} screenshots')
+                    log_info(f'run:\n    python -m http.server --directory {args.result_dir} 8080')
+                    log_info(f'then open:\n    http://localhost:8080/?reference={args.ground_truth}&compare={args.compare}')
                 sys.exit(failures)
 
 

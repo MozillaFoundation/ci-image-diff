@@ -100,42 +100,44 @@ async def content_is_stable(page):
     return False
 
 
-async def capture_screenshot_for_url_at_width(browser, browser_type, url_path, page_url, page_width):
+async def deferred_capture_screenshot_for_url(browser, browser_type, url_path, page_url, page_widths):
     browser_name = browser_type.name
 
-    # Create a new viewport, size it to the correct width, and navigate to the URL we want to capture.
+    log_info(f'Navigating to {page_url} using {browser_name}')
     page = await browser.new_page()
-    await page.set_viewport_size({ 'width': page_width, 'height': 800 })
-
-    log_info(f'Navigating to {page_url} using {browser_name} at size {page_width}, url:', url_path)
     await page.goto(page_url)
 
     # Rather than relying on 'networkidle' or 'domcontentready', we wait for the page DOM to stabilize.
     await content_is_stable(page)
 
-    # Figure out which path we need to write to, and ensure the dir for that exists.
-    parent = f'./diffs/{screenshot_base_dir}/{browser_name}-{page_width}/{url_path}'
-    Path(parent).mkdir(parents=True, exist_ok=True)
-    image_path = f'{parent}/screenshot.png'
+    for page_width in page_widths:
+        log_info(f'- [{browser_name}] Taking screenshot at size {page_width} ({page_url})')
 
-    log_info(f'Creating {image_path}')
-    await page.screenshot(path=image_path, full_page=True)
+        # Set the viewport size it to the correct width, and navigate to the URL we want to capture.
+        await page.set_viewport_size({ 'width': page_width, 'height': 800 })
+
+        # Figure out which path we need to write to, and ensure the dir for that exists.
+        parent = f'./diffs/{screenshot_base_dir}/{browser_name}-{page_width}/{url_path}'
+        Path(parent).mkdir(parents=True, exist_ok=True)
+        image_path = f'{parent}/screenshot.png'
+
+        # log_info(f'Creating {image_path}')
+        await page.screenshot(path=image_path, full_page=True)
+
     await page.close()
 
 
 async def capture_screenshot_for_url(browser, browser_type, page_widths, url_path, page_url):
-    tasklist = []
-    for width in page_widths:
-        tasklist.append(lambda page_width=width:
-            capture_screenshot_for_url_at_width(
+    return [
+        lambda:
+            deferred_capture_screenshot_for_url(
                 browser,
                 browser_type,
                 url_path,
                 page_url,
-                page_width
+                page_widths
             )
-        )
-    return tasklist
+    ]
 
 
 async def capture_screenshots_for(browser_type, page_widths, urls, url_paths):

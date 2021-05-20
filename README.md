@@ -36,13 +36,13 @@ Then to install the dependencies:
 Use `compare.py`. Its help documentation is listed here for convenience, but documentation may go out of date: run `python compare.py -h` for its most up to date documentation.
 
 ```
-usage: compare.py [-h] [-b BASE_DIR] [-c COMPARE] [-co] [-g GROUND_TRUTH]
-                  [-i STABILITY_INTERVAL] [-l LIST] [-m] [-o] [-p]
-                  [-q QUEUE_SIZE] [-r RESULT_DIR] [-u] [-v] [-vx] [-w WIDTH]
-                  [-z]
+usage: compare.py [-h] [-b BASE_DIR] [-c COMPARE] [-co] [-d PAGE_DELAY]
+                  [-g GROUND_TRUTH] [-i STABILITY_INTERVAL] [-l LIST] [-m]
+                  [-o] [-p] [-q QUEUE_SIZE] [-r RESULT_DIR] [-u] [-v] [-vx]
+                  [-w WIDTH] [-z]
                   [url]
 
-Take a screenshot of a web page.
+Create diff sets for web pages, and view those difference in the browser.
 
 positional arguments:
   url                   The URL for the web page.
@@ -55,6 +55,9 @@ optional arguments:
                         Save screenshots to the indicated dir. Defaults to
                         compare.
   -co, --compare-only   Do not (re)fetch screenshots.
+  -d PAGE_DELAY, --page-delay PAGE_DELAY
+                        Graceperiod in milliseconds before taking a screenshot
+                        after page is stable. Defaults to 1000.
   -g GROUND_TRUTH, --ground-truth GROUND_TRUTH
                         Set the ground truth dir. Defaults to main.
   -i STABILITY_INTERVAL, --stability-interval STABILITY_INTERVAL
@@ -67,8 +70,8 @@ optional arguments:
   -p, --log-path-only   Only log which path is being compared, rather than
                         image locations.
   -q QUEUE_SIZE, --queue-size QUEUE_SIZE
-                        Sets the maximum number of concurrent network
-                        requests. Defaults to 5
+                        Sets the number of concurrent network requests in the
+                        batch queue. Defaults to 10
   -r RESULT_DIR, --result-dir RESULT_DIR
                         Directory for comparison results. Defaults to results.
   -u, --update          Update the ground truth screenshots.

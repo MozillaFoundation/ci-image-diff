@@ -25,6 +25,7 @@ parser.add_argument('url', nargs='?', help='The URL for the web page.')
 parser.add_argument('-b', '--base-dir', default='diffs', help='Directory for diffs. Defaults to diffs.')
 parser.add_argument('-c', '--compare', default='compare', help='Save screenshots to the indicated dir. Defaults to compare.')
 parser.add_argument('-co', '--compare-only', action='store_true', help='Do not (re)fetch screenshots.')
+parser.add_argument('-d', '--page-delay', type=int, default=1000, help='Graceperiod in milliseconds before taking a screenshot after page is stable. Defaults to 1000.')
 parser.add_argument('-g', '--ground-truth', default='main', help='Set the ground truth dir. Defaults to main.')
 parser.add_argument('-i', '--stability-interval', type=int, default=1000, help='Set the "is DOM stable?" test interval in milliseconds. Defaults to 1000.')
 parser.add_argument('-l', '--list', help='Read list of URLs to test from a plain text, newline delimited file.')
@@ -90,8 +91,10 @@ async def content_is_stable(page):
         inner_html = await html.inner_html()
 
         if inner_html == previous_html:
-            # Page has stabilised
-            return True
+            js = '(imgs) => Array.from(imgs).every(img => img.complete)'
+            loaded = await page.eval_on_selector_all('img', js)
+            if loaded is True:
+                return True
 
         previous_html = inner_html
         await asyncio.sleep(args.stability_interval / 1000)
@@ -107,14 +110,13 @@ async def deferred_capture_screenshot_for_url(browser, browser_type, url_path, p
     page = await browser.new_page()
     await page.goto(page_url)
 
-    # Rather than relying on 'networkidle' or 'domcontentready', we wait for the page DOM to stabilize.
-    await content_is_stable(page)
-
     for page_width in page_widths:
-        log_info(f'- [{browser_name}] Taking screenshot at size {page_width} ({page_url})')
-
         # Set the viewport size it to the correct width, and navigate to the URL we want to capture.
         await page.set_viewport_size({ 'width': page_width, 'height': 800 })
+        await content_is_stable(page)
+        await page.wait_for_timeout(args.page_delay)
+
+        log_info(f'- [{browser_name}] Taking screenshot at size {page_width} ({page_url})')
 
         # Figure out which path we need to write to, and ensure the dir for that exists.
         parent = f'./diffs/{screenshot_base_dir}/{browser_name}-{page_width}/{url_path}'

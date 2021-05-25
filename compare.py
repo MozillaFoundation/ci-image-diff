@@ -22,6 +22,7 @@ from playwright.async_api import async_playwright
 
 parser = argparse.ArgumentParser(description='Create diff sets for web pages, and view those difference in the browser.')
 parser.add_argument('url', nargs='?', help='The URL for the web page.')
+parser.add_argument('-a', '--allow-animations', action='store_true', help='Allow CSS animations. This will almost certainly yield false positives.')
 parser.add_argument('-b', '--base-dir', default='diffs', help='Directory for diffs. Defaults to diffs.')
 parser.add_argument('-c', '--compare', default='compare', help='Save screenshots to the indicated dir. Defaults to compare.')
 parser.add_argument('-co', '--compare-only', action='store_true', help='Do not (re)fetch screenshots.')
@@ -35,10 +36,10 @@ parser.add_argument('-p', '--log-path-only', action='store_true', help='Only log
 parser.add_argument('-q', '--queue-size', type=int, default=10, help='Sets the number of concurrent network requests in the batch queue. Defaults to 10')
 parser.add_argument('-r', '--result-dir', default='results', help='Directory for comparison results. Defaults to results.')
 parser.add_argument('-u', '--update', action='store_true', help='Update the ground truth screenshots.')
-parser.add_argument('-v', '--verbose', action='store_true', help="Log progress to stdout.")
-parser.add_argument('-vx', '--verbose-exclusive', action='store_true', help="Log progress, but skip logging of each diff process.")
+parser.add_argument('-v', '--verbose', action='store_true', help='Log progress to stdout.')
+parser.add_argument('-vx', '--verbose-exclusive', action='store_true', help='Log progress, but skip logging of each diff process.')
 parser.add_argument('-w', '--width', type=str, default='1200', help='The browser width in pixels. Defaults to 1200.')
-parser.add_argument('-z', '--server-hint', action='store_true', help="Print the diff viewer instructions at the end of the run.")
+parser.add_argument('-z', '--server-hint', action='store_true', help='Print the diff viewer instructions at the end of the run.')
 args = parser.parse_args()
 
 # Make sure all width(s) are numbers
@@ -115,6 +116,16 @@ async def deferred_capture_screenshot_for_url(browser, browser_type, url_path, p
         await page.set_viewport_size({ 'width': page_width, 'height': 800 })
         await content_is_stable(page)
         await page.wait_for_timeout(args.page_delay)
+
+        # disable CSS animations, unless explicitly told not to.
+        if not args.allow_animations:
+            await page.eval_on_selector('head', '''
+            (head) => {
+                const noAnimation = document.createElement(`style`);
+                noAnimation.textContent = `* { animation: none!important; }`;
+                head.append(noAnimation);
+            }
+            ''')
 
         log_info(f'- [{browser_name}] Taking screenshot at size {page_width} ({page_url})')
 

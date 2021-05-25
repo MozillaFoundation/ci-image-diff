@@ -36,7 +36,7 @@ Then to install the dependencies:
 Use `compare.py`. Its help documentation is listed here for convenience, but documentation may go out of date: run `python compare.py -h` for its most up to date documentation.
 
 ```
-usage: compare.py [-h] [-b BASE_DIR] [-c COMPARE] [-co] [-d PAGE_DELAY]
+usage: compare.py [-h] [-a] [-b BASE_DIR] [-c COMPARE] [-co] [-d PAGE_DELAY]
                   [-g GROUND_TRUTH] [-i STABILITY_INTERVAL] [-l LIST] [-m]
                   [-o] [-p] [-q QUEUE_SIZE] [-r RESULT_DIR] [-u] [-v] [-vx]
                   [-w WIDTH] [-z]
@@ -49,6 +49,9 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
+  -a, --allow-animations
+                        Allow CSS animations. This will almost certainly yield
+                        false positives.
   -b BASE_DIR, --base-dir BASE_DIR
                         Directory for diffs. Defaults to diffs.
   -c COMPARE, --compare COMPARE

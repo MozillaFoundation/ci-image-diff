@@ -38,7 +38,7 @@ parser.add_argument('-r', '--result-dir', default='results', help='Directory for
 parser.add_argument('-u', '--update', action='store_true', help='Update the ground truth screenshots.')
 parser.add_argument('-v', '--verbose', action='store_true', help='Log progress to stdout.')
 parser.add_argument('-vx', '--verbose-exclusive', action='store_true', help='Log progress, but skip logging of each diff process.')
-parser.add_argument('-w', '--width', type=str, default='1200', help='The browser width in pixels. Defaults to 1200.')
+parser.add_argument('-w', '--width', type=str, default='1200', help='The browser width in pixels. This can be a comma-separated list of multiple widths. Defaults to 1200.')
 parser.add_argument('-z', '--server-hint', action='store_true', help='Print the diff viewer instructions at the end of the run.')
 args = parser.parse_args()
 
